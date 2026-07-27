@@ -2,13 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import (
-    CORSMiddleware,
-)
-from slowapi import (
-    _rate_limit_exceeded_handler,
-)
-from slowapi.errors import RateLimitExceeded
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -19,14 +13,18 @@ from app.api.routes import (
     recruitment,
 )
 from app.core.config import settings
+from app.core.error_handlers import (
+    register_error_handlers,
+)
 from app.core.rate_limit import limiter
 from app.core.security_headers import (
     SecurityHeadersMiddleware,
 )
 from app.db.database import Base, engine
-from app.models.auth_audit_log import (
-    AuthAuditLog,
-)
+
+# These imports ensure that SQLAlchemy registers all
+# application models in Base.metadata.
+from app.models.auth_audit_log import AuthAuditLog
 from app.models.fraud import (
     Transaction,
     TransactionAuditEvent,
@@ -38,9 +36,7 @@ from app.models.recruitment import (
     CVApplication,
     JobPost,
 )
-from app.models.refresh_token import (
-    RefreshToken,
-)
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
 
@@ -56,15 +52,17 @@ logging.basicConfig(
     ),
 )
 
-logger = logging.getLogger(
-    __name__
-)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(
     app: FastAPI,
 ):
+    """
+    Manage application startup and shutdown operations.
+    """
+
     logger.info(
         "Starting %s version %s in %s mode.",
         settings.APP_NAME,
@@ -73,13 +71,21 @@ async def lifespan(
     )
 
     if settings.CREATE_DATABASE_TABLES:
-        Base.metadata.create_all(
-            bind=engine
-        )
+        try:
+            Base.metadata.create_all(
+                bind=engine
+            )
 
-        logger.info(
-            "Database tables verified."
-        )
+            logger.info(
+                "Database tables verified."
+            )
+
+        except SQLAlchemyError:
+            logger.exception(
+                "Database table verification failed."
+            )
+
+            raise
 
     yield
 
@@ -94,9 +100,8 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description=(
-        "AI-powered financial fraud "
-        "detection and recruitment "
-        "intelligence platform."
+        "AI-powered financial fraud detection "
+        "and recruitment intelligence platform."
     ),
     docs_url=(
         "/docs"
@@ -117,24 +122,22 @@ app = FastAPI(
 )
 
 
+# SlowAPI requires the limiter to be attached to
+# application state.
 app.state.limiter = limiter
 
-app.add_exception_handler(
-    RateLimitExceeded,
-    _rate_limit_exceeded_handler,
-)
 
-
+# Security headers are applied to all HTTP responses.
 app.add_middleware(
     SecurityHeadersMiddleware,
 )
 
 
+# Cross-origin requests are restricted to configured
+# frontend origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=(
-        settings.ALLOWED_ORIGINS
-    ),
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=[
         "GET",
@@ -148,14 +151,24 @@ app.add_middleware(
         "Authorization",
         "Content-Type",
         "Accept",
+        "X-Request-ID",
     ],
     expose_headers=[
+        "X-Request-ID",
         "X-RateLimit-Limit",
         "X-RateLimit-Remaining",
         "X-RateLimit-Reset",
         "Retry-After",
     ],
 )
+
+
+# Register the standardized application, validation,
+# authentication, authorization, database, rate-limit,
+# and unexpected-error handlers.
+#
+# This also registers RequestIDMiddleware.
+register_error_handlers(app)
 
 
 app.include_router(
@@ -179,14 +192,19 @@ app.include_router(
 )
 
 
-@app.get("/")
+@app.get(
+    "/",
+    tags=["System"],
+)
 def root():
+    """
+    Return basic application information.
+    """
+
     return {
         "app": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "environment": (
-            settings.ENVIRONMENT
-        ),
+        "environment": settings.ENVIRONMENT,
         "status": "running",
         "docs": (
             "/docs"
@@ -196,8 +214,19 @@ def root():
     }
 
 
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["System"],
+)
 def health():
+    """
+    Check application and database health.
+
+    The endpoint remains available when the database is
+    unavailable so deployment platforms can inspect the
+    degraded state.
+    """
+
     database_status = "healthy"
 
     try:
@@ -222,8 +251,6 @@ def health():
     return {
         "status": overall_status,
         "database": database_status,
-        "environment": (
-            settings.ENVIRONMENT
-        ),
+        "environment": settings.ENVIRONMENT,
         "version": settings.APP_VERSION,
     }
