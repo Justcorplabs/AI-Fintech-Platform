@@ -16,10 +16,16 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 from pypdf import PdfReader
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
 from app.core.dependencies import require_permission
+from app.core.exceptions import (
+    BadRequestError,
+    ResourceNotFoundError,
+)
+from app.core.file_security import validate_cv_upload
 from app.core.permissions import Permission
 from app.core.rate_limit import (
     CANDIDATE_SCORING_LIMIT,
@@ -304,24 +310,49 @@ def build_resume_from_upload(
 
 def score_candidate_with_sentinel(
     job: JobPost,
-    file: UploadFile,
-    content: bytes,
+    raw_text: str,
 ):
+    """
+    Score an already validated and extracted CV.
+
+    File validation and document extraction occur before
+    this function so candidate scoring only receives
+    trusted text.
+    """
+
+    if (
+        not raw_text
+        or len(raw_text.strip()) < 20
+    ):
+        raise BadRequestError(
+            (
+                "Could not extract enough readable "
+                "text from this CV."
+            )
+        )
+
     job_description = (
         build_job_description_from_job(
             job
         )
     )
 
-    (
-        raw_text,
-        review,
-        built_resume,
-    ) = review_resume_from_upload(
-        file=file,
-        content=content,
+    review = resume_reviewer.review_resume(
+        raw_text=raw_text,
         target_keywords=None,
         job_description=job_description,
+    )
+
+    built_resume = resume_builder.build(
+        raw_text,
+        review,
+    )
+
+    review["candidate_intelligence"] = (
+        candidate_intelligence.generate(
+            review=review,
+            built_resume=built_resume,
+        )
     )
 
     intelligence = (
@@ -939,9 +970,12 @@ async def upload_cv(
         recruitment_write_access
     ),
 ):
-    filename = validate_resume_file(
-        file
-    )
+    """
+    Validate, parse, score and persist a CV application.
+
+    Only validated PDF and DOCX documents reach the
+    extraction and scoring services.
+    """
 
     job_uuid = parse_uuid(
         job_id
@@ -956,22 +990,31 @@ async def upload_cv(
     )
 
     if not job:
-        raise HTTPException(
-            status_code=404,
-            detail="Job post not found.",
+        raise ResourceNotFoundError(
+            "Job post not found."
         )
 
-    content = await file.read()
+    validated_upload = (
+        await validate_cv_upload(
+            file
+        )
+    )
+
+    raw_text = cv_parser.extract_text(
+        validated_upload.content,
+        validated_upload.extension,
+    )
 
     scoring = score_candidate_with_sentinel(
         job=job,
-        file=file,
-        content=content,
+        raw_text=raw_text,
     )
 
     application = CVApplication(
         job_post_id=job_uuid,
-        cv_filename=filename,
+        cv_filename=(
+            validated_upload.safe_filename
+        ),
         raw_text=scoring["raw_text"],
         candidate_name=(
             scoring["candidate_name"]
@@ -1005,6 +1048,25 @@ async def upload_cv(
                     "candidate_intelligence"
                 ]
             ),
+            "upload_security": {
+                "original_filename": (
+                    validated_upload
+                    .original_filename
+                ),
+                "safe_filename": (
+                    validated_upload
+                    .safe_filename
+                ),
+                "extension": (
+                    validated_upload.extension
+                ),
+                "content_type": (
+                    validated_upload.content_type
+                ),
+                "size_bytes": (
+                    validated_upload.size_bytes
+                ),
+            },
         },
         status=ApplicationStatus.scored,
         match_score=(
@@ -1016,9 +1078,14 @@ async def upload_cv(
         scored_at=func.now(),
     )
 
-    db.add(application)
-    db.commit()
-    db.refresh(application)
+    try:
+        db.add(application)
+        db.commit()
+        db.refresh(application)
+
+    except SQLAlchemyError:
+        db.rollback()
+        raise
 
     return {
         "application_id": (
