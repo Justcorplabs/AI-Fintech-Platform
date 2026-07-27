@@ -54,7 +54,11 @@ class Settings(BaseSettings):
     DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_RECYCLE_SECONDS: int = 300
 
+    # File-upload and CV-processing limits
     MAX_UPLOAD_SIZE_MB: int = 10
+    MAX_CV_PAGES: int = 100
+    MAX_CV_TEXT_CHARACTERS: int = 500_000
+    MAX_DOCX_UNCOMPRESSED_MB: int = 50
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -96,20 +100,29 @@ class Settings(BaseSettings):
         mode="before",
     )
     @classmethod
-    def parse_allowed_origins(cls, value):
+    def parse_allowed_origins(
+        cls,
+        value,
+    ):
         if value is None:
             return [
-                "http://localhost:5173"
+                "http://localhost:5173",
             ]
 
-        if isinstance(value, list):
+        if isinstance(
+            value,
+            list,
+        ):
             return [
                 str(origin).strip().rstrip("/")
                 for origin in value
                 if str(origin).strip()
             ]
 
-        if isinstance(value, str):
+        if isinstance(
+            value,
+            str,
+        ):
             raw_value = value.strip()
 
             if not raw_value:
@@ -117,9 +130,14 @@ class Settings(BaseSettings):
 
             if raw_value.startswith("["):
                 try:
-                    parsed = json.loads(raw_value)
+                    parsed = json.loads(
+                        raw_value
+                    )
 
-                    if not isinstance(parsed, list):
+                    if not isinstance(
+                        parsed,
+                        list,
+                    ):
                         raise ValueError
 
                     return [
@@ -148,13 +166,17 @@ class Settings(BaseSettings):
             "JSON list, or comma-separated string."
         )
 
-    @field_validator("FRONTEND_URL")
+    @field_validator(
+        "FRONTEND_URL"
+    )
     @classmethod
     def normalise_frontend_url(
         cls,
         value: str,
     ) -> str:
-        cleaned = value.strip().rstrip("/")
+        cleaned = (
+            value.strip().rstrip("/")
+        )
 
         if not cleaned:
             raise ValueError(
@@ -267,7 +289,9 @@ class Settings(BaseSettings):
 
         return value
 
-    @field_validator("MAX_UPLOAD_SIZE_MB")
+    @field_validator(
+        "MAX_UPLOAD_SIZE_MB"
+    )
     @classmethod
     def validate_upload_limit(
         cls,
@@ -281,9 +305,67 @@ class Settings(BaseSettings):
 
         return value
 
-    @model_validator(mode="after")
-    def validate_production_settings(self):
-        if self.ENVIRONMENT == "production":
+    @field_validator(
+        "MAX_CV_PAGES"
+    )
+    @classmethod
+    def validate_max_cv_pages(
+        cls,
+        value: int,
+    ) -> int:
+        if value < 1 or value > 500:
+            raise ValueError(
+                "MAX_CV_PAGES must be "
+                "between 1 and 500."
+            )
+
+        return value
+
+    @field_validator(
+        "MAX_CV_TEXT_CHARACTERS"
+    )
+    @classmethod
+    def validate_max_cv_text_characters(
+        cls,
+        value: int,
+    ) -> int:
+        if (
+            value < 1_000
+            or value > 2_000_000
+        ):
+            raise ValueError(
+                "MAX_CV_TEXT_CHARACTERS must be "
+                "between 1000 and 2000000."
+            )
+
+        return value
+
+    @field_validator(
+        "MAX_DOCX_UNCOMPRESSED_MB"
+    )
+    @classmethod
+    def validate_docx_uncompressed_limit(
+        cls,
+        value: int,
+    ) -> int:
+        if value < 1 or value > 500:
+            raise ValueError(
+                "MAX_DOCX_UNCOMPRESSED_MB must be "
+                "between 1 and 500."
+            )
+
+        return value
+
+    @model_validator(
+        mode="after"
+    )
+    def validate_production_settings(
+        self,
+    ):
+        if (
+            self.ENVIRONMENT
+            == "production"
+        ):
             unsafe_secrets = {
                 "",
                 "change-me-in-production",
@@ -292,7 +374,9 @@ class Settings(BaseSettings):
             }
 
             if (
-                self.SECRET_KEY.strip().lower()
+                self.SECRET_KEY
+                .strip()
+                .lower()
                 in unsafe_secrets
             ):
                 raise ValueError(
@@ -325,14 +409,18 @@ class Settings(BaseSettings):
         return self
 
     @property
-    def is_production(self) -> bool:
+    def is_production(
+        self,
+    ) -> bool:
         return (
             self.ENVIRONMENT
             == "production"
         )
 
     @property
-    def docs_enabled(self) -> bool:
+    def docs_enabled(
+        self,
+    ) -> bool:
         if self.is_production:
             return self.ENABLE_API_DOCS
 
