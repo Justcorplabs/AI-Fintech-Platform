@@ -1,0 +1,19 @@
+{
+    "champion_model": "LightGBM Tuned + Isotonic",
+    "model_version": "lightgbm-tuned-v2-calibrated",
+    "status": "production_ready",
+    "calibration": "isotonic",
+    "roc_auc": 0.976213,
+    "pr_auc": 0.876658,
+    "brier_score": 0.008616,
+    "recommended_threshold_policy": {
+        "low_risk": "score < 0.40",
+        "manual_review": "0.40 <= score < 0.60",
+        "high_alert": "score >= 0.60"
+    },
+    "champion_reason": "Selected because it achieved the best ROC-AUC, strongest calibrated probability reliability, best F1 balance, and lowest false-positive burden compared with tuned XGBoost and CatBoost.",
+    "challengers": [
+        "XGBoost Tuned",
+        "CatBoost Tuned"
+    ]
+}

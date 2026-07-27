@@ -1,0 +1,11 @@
+{
+    "model_name": "LightGBM Tuned",
+    "model_version": "lightgbm-tuned-v2-calibrated",
+    "threshold_low": 0.4,
+    "threshold_high": 0.6,
+    "roc_auc": 0.9762128826095815,
+    "pr_auc": 0.8766581652359666,
+    "brier_score": 0.008616176835254724,
+    "calibration": "isotonic",
+    "recommendation": "Use risk bands: low <0.40, review 0.40-0.60, high >=0.60"
+}

@@ -1,0 +1,4 @@
+model_name,model_version,roc_auc,pr_auc,precision,recall,f1_score,training_time_seconds,role,brier_score
+XGBoost Tuned,xgboost-tuned-v1,0.973874,0.848838,0.722751,0.808614,0.763275,268.49,challenger,
+CatBoost Tuned,catboost-tuned-v1,0.967136,0.812986,0.566394,0.820469,0.670158,1155.63,challenger,
+LightGBM Tuned + Isotonic,lightgbm-tuned-v2-calibrated,0.976213,0.876658,0.8827,0.797484,0.837931,,champion,0.008616
