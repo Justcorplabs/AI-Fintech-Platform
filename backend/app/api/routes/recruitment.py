@@ -1,9 +1,7 @@
 import re
 import uuid
-from io import BytesIO
 from typing import List, Optional
 
-from docx import Document
 from fastapi import (
     APIRouter,
     Depends,
@@ -15,7 +13,6 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import StreamingResponse
-from pypdf import PdfReader
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
@@ -79,73 +76,6 @@ recruitment_write_access = require_permission(
     Permission.RECRUITMENT_WRITE
 )
 
-
-SUPPORTED_RESUME_EXTENSIONS = (
-    ".pdf",
-    ".txt",
-    ".docx",
-)
-
-
-def validate_resume_file(
-    file: UploadFile,
-) -> str:
-    filename = file.filename or ""
-
-    if not filename.lower().endswith(
-        SUPPORTED_RESUME_EXTENSIONS
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Only PDF, TXT, and DOCX "
-                "files are accepted."
-            ),
-        )
-
-    return filename
-
-
-def extract_text_from_upload(
-    filename: str,
-    content: bytes,
-) -> str:
-    name = filename.lower()
-
-    if name.endswith(".txt"):
-        return content.decode(
-            "utf-8",
-            errors="ignore",
-        )
-
-    if name.endswith(".pdf"):
-        reader = PdfReader(
-            BytesIO(content)
-        )
-
-        pages = [
-            page.extract_text() or ""
-            for page in reader.pages
-        ]
-
-        return "\n".join(
-            pages
-        ).strip()
-
-    if name.endswith(".docx"):
-        document = Document(
-            BytesIO(content)
-        )
-
-        return "\n".join(
-            paragraph.text
-            for paragraph in document.paragraphs
-        ).strip()
-
-    raise HTTPException(
-        status_code=400,
-        detail="Unsupported file type.",
-    )
 
 
 def parse_keywords(
@@ -242,29 +172,59 @@ def build_job_description_from_job(
     ).strip()
 
 
-def review_resume_from_upload(
+async def validate_and_extract_resume(
     file: UploadFile,
-    content: bytes,
-    target_keywords: Optional[str],
-    job_description: Optional[str],
 ):
-    filename = file.filename or "resume"
+    """
+    Validate a PDF or DOCX upload and extract trusted text.
 
-    raw_text = extract_text_from_upload(
-        filename,
-        content,
+    All resume-processing endpoints use this shared gateway so
+    size, filename, MIME, signature and document-structure
+    validation cannot drift between routes.
+    """
+
+    validated_upload = await validate_cv_upload(
+        file
+    )
+
+    raw_text = cv_parser.extract_text(
+        validated_upload.content,
+        validated_upload.extension,
     )
 
     if (
         not raw_text
         or len(raw_text.strip()) < 20
     ):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Could not extract readable "
+        raise BadRequestError(
+            (
+                "Could not extract enough readable "
                 "text from this resume."
-            ),
+            )
+        )
+
+    return (
+        validated_upload,
+        raw_text,
+    )
+
+
+def review_resume_from_text(
+    raw_text: str,
+    target_keywords: Optional[str],
+    job_description: Optional[str],
+):
+    """Review already validated and extracted resume text."""
+
+    if (
+        not raw_text
+        or len(raw_text.strip()) < 20
+    ):
+        raise BadRequestError(
+            (
+                "Could not extract enough readable "
+                "text from this resume."
+            )
         )
 
     review = resume_reviewer.review_resume(
@@ -294,15 +254,15 @@ def review_resume_from_upload(
     )
 
 
-def build_resume_from_upload(
-    file: UploadFile,
-    content: bytes,
+def build_resume_from_text(
+    raw_text: str,
     target_keywords: Optional[str],
     job_description: Optional[str],
 ):
-    return review_resume_from_upload(
-        file=file,
-        content=content,
+    """Build a resume from already validated text."""
+
+    return review_resume_from_text(
+        raw_text=raw_text,
         target_keywords=target_keywords,
         job_description=job_description,
     )
@@ -654,25 +614,27 @@ async def review_resume(
         recruitment_read_access
     ),
 ):
-    filename = validate_resume_file(
+    (
+        validated_upload,
+        raw_text,
+    ) = await validate_and_extract_resume(
         file
     )
-
-    content = await file.read()
 
     (
         _,
         review,
         built_resume,
-    ) = review_resume_from_upload(
-        file=file,
-        content=content,
+    ) = review_resume_from_text(
+        raw_text=raw_text,
         target_keywords=target_keywords,
         job_description=job_description,
     )
 
     return {
-        "filename": filename,
+        "filename": (
+            validated_upload.safe_filename
+        ),
         **review,
         "built_resume": built_resume,
     }
@@ -697,19 +659,19 @@ async def rewrite_cv(
         recruitment_read_access
     ),
 ):
-    filename = validate_resume_file(
+    (
+        validated_upload,
+        raw_text,
+    ) = await validate_and_extract_resume(
         file
     )
-
-    content = await file.read()
 
     (
         _,
         review,
         built_resume,
-    ) = review_resume_from_upload(
-        file=file,
-        content=content,
+    ) = review_resume_from_text(
+        raw_text=raw_text,
         target_keywords=target_keywords,
         job_description=job_description,
     )
@@ -719,7 +681,9 @@ async def rewrite_cv(
     )
 
     return {
-        "filename": filename,
+        "filename": (
+            validated_upload.safe_filename
+        ),
         "review": review,
         "rewrite": rewrite,
         "built_resume": built_resume,
@@ -750,25 +714,27 @@ async def build_resume(
         recruitment_read_access
     ),
 ):
-    filename = validate_resume_file(
+    (
+        validated_upload,
+        raw_text,
+    ) = await validate_and_extract_resume(
         file
     )
-
-    content = await file.read()
 
     (
         _,
         review,
         built_resume,
-    ) = build_resume_from_upload(
-        file=file,
-        content=content,
+    ) = build_resume_from_text(
+        raw_text=raw_text,
         target_keywords=target_keywords,
         job_description=job_description,
     )
 
     return {
-        "filename": filename,
+        "filename": (
+            validated_upload.safe_filename
+        ),
         "review": review,
         "built_resume": built_resume,
         "candidate_intelligence": (
@@ -798,19 +764,19 @@ async def download_cv_docx(
         recruitment_read_access
     ),
 ):
-    validate_resume_file(
+    (
+        _,
+        raw_text,
+    ) = await validate_and_extract_resume(
         file
     )
-
-    content = await file.read()
 
     (
         _,
         review,
         built_resume,
-    ) = build_resume_from_upload(
-        file=file,
-        content=content,
+    ) = build_resume_from_text(
+        raw_text=raw_text,
         target_keywords=target_keywords,
         job_description=job_description,
     )
@@ -885,19 +851,19 @@ async def download_application_pack_docx(
         recruitment_read_access
     ),
 ):
-    validate_resume_file(
+    (
+        _,
+        raw_text,
+    ) = await validate_and_extract_resume(
         file
     )
-
-    content = await file.read()
 
     (
         _,
         review,
         built_resume,
-    ) = build_resume_from_upload(
-        file=file,
-        content=content,
+    ) = build_resume_from_text(
+        raw_text=raw_text,
         target_keywords=target_keywords,
         job_description=job_description,
     )
