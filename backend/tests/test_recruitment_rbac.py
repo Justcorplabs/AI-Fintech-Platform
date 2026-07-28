@@ -83,6 +83,16 @@ RECRUITMENT_ROUTE_PERMISSIONS = [
         Permission.RECRUITMENT_READ,
     ),
     (
+        "GET",
+        (
+            "/api/v1/recruitment/"
+            "applications/"
+            "{application_id}/"
+            "scoring-audit"
+        ),
+        Permission.RECRUITMENT_READ,
+    ),
+    (
         "PATCH",
         (
             "/api/v1/recruitment/"
