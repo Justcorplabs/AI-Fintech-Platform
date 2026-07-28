@@ -43,6 +43,7 @@ from app.schemas.recruitment import (
     JobCreate,
     JobOut,
     RecruitmentDashboardOut,
+    ScoringAuditOut,
 )
 from app.services.recruitment.candidate_intelligence import (
     candidate_intelligence,
@@ -52,6 +53,9 @@ from app.services.recruitment.cv_rewriter import cv_rewriter
 from app.services.recruitment.docx_generator import docx_generator
 from app.services.recruitment.resume_builder import resume_builder
 from app.services.recruitment.resume_reviewer import resume_reviewer
+from app.services.recruitment.scoring_audit import (
+    scoring_audit_service,
+)
 
 
 router = APIRouter(
@@ -450,6 +454,19 @@ def score_candidate_with_sentinel(
         f"{missing_requirements}."
     )
 
+    scoring_audit = (
+        scoring_audit_service.build_snapshot(
+            review=review,
+            intelligence=intelligence,
+            matched_requirements=(
+                matched_skills
+            ),
+            missing_requirements=(
+                missing_skills
+            ),
+        )
+    )
+
     return {
         "raw_text": raw_text,
         "parsed": parsed,
@@ -457,6 +474,9 @@ def score_candidate_with_sentinel(
         "built_resume": built_resume,
         "candidate_intelligence": (
             intelligence
+        ),
+        "scoring_audit": (
+            scoring_audit
         ),
         "candidate_name": (
             candidate_name
@@ -976,6 +996,30 @@ async def upload_cv(
         raw_text=raw_text,
     )
 
+    scoring_audit = (
+        scoring.get(
+            "scoring_audit"
+        )
+        or scoring_audit_service.build_snapshot(
+            review=scoring.get(
+                "review",
+                {},
+            ),
+            intelligence=scoring.get(
+                "candidate_intelligence",
+                {},
+            ),
+            matched_requirements=scoring.get(
+                "matched_skills",
+                [],
+            ),
+            missing_requirements=scoring.get(
+                "missing_skills",
+                [],
+            ),
+        )
+    )
+
     application = CVApplication(
         job_post_id=job_uuid,
         cv_filename=(
@@ -1013,6 +1057,9 @@ async def upload_cv(
                 scoring[
                     "candidate_intelligence"
                 ]
+            ),
+            "scoring_audit": (
+                scoring_audit
             ),
             "upload_security": {
                 "original_filename": (
@@ -1078,6 +1125,11 @@ async def upload_cv(
         "education_score": (
             scoring["education_score"]
         ),
+        "scoring_policy_version": (
+            scoring_audit.get(
+                "policy_version"
+            )
+        ),
     }
 
 
@@ -1111,6 +1163,55 @@ def get_applications(
         )
         .all()
     )
+
+
+@router.get(
+    (
+        "/applications/{application_id}"
+        "/scoring-audit"
+    ),
+    response_model=ScoringAuditOut,
+)
+def get_application_scoring_audit(
+    application_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        recruitment_read_access
+    ),
+):
+    application_uuid = parse_uuid(
+        application_id
+    )
+
+    application = (
+        db.query(CVApplication)
+        .filter(
+            CVApplication.id
+            == application_uuid
+        )
+        .first()
+    )
+
+    if not application:
+        raise ResourceNotFoundError(
+            "Application not found."
+        )
+
+    scoring_audit = (
+        scoring_audit_service.extract_snapshot(
+            application.parsed_data
+        )
+    )
+
+    if scoring_audit is None:
+        raise ResourceNotFoundError(
+            (
+                "Scoring audit is not available "
+                "for this application."
+            )
+        )
+
+    return scoring_audit
 
 
 @router.patch(
@@ -1185,8 +1286,36 @@ def update_application_status(
         ]
     )
 
-    db.commit()
-    db.refresh(application)
+    if requested_status in {
+        "shortlisted",
+        "rejected",
+    }:
+        application.parsed_data = (
+            scoring_audit_service.record_human_review(
+                parsed_data=(
+                    application.parsed_data
+                ),
+                reviewer_id=getattr(
+                    current_user,
+                    "id",
+                    None,
+                ),
+                reviewer_email=getattr(
+                    current_user,
+                    "email",
+                    None,
+                ),
+                decision=requested_status,
+            )
+        )
+
+    try:
+        db.commit()
+        db.refresh(application)
+
+    except SQLAlchemyError:
+        db.rollback()
+        raise
 
     return application
 

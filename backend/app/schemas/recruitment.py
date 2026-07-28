@@ -1,7 +1,8 @@
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 
 class JobCreate(BaseModel):
@@ -22,7 +23,9 @@ class JobOut(BaseModel):
     is_active: bool
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
 
 class CVApplicationOut(BaseModel):
@@ -38,7 +41,44 @@ class CVApplicationOut(BaseModel):
     status: str
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        use_enum_values=True,
+    )
+
+
+class HumanReviewAuditOut(BaseModel):
+    reviewed: bool
+    reviewed_by_user_id: Optional[str]
+    reviewed_by_email: Optional[str]
+    reviewed_at: Optional[datetime]
+    decision: Optional[str]
+    notes: Optional[str]
+
+    model_config = ConfigDict(
+        extra="allow"
+    )
+
+
+class ScoringAuditOut(BaseModel):
+    policy_version: str
+    calculated_at: datetime
+    job_context_available: bool
+    components: Dict[str, float]
+    weights: Dict[str, float]
+    reference_scores: Dict[str, float]
+    adjustments: Dict[str, Any]
+    calculation: Dict[str, Any]
+    matched_requirements: List[str]
+    missing_requirements: List[str]
+    final_score: float
+    recommendation: str
+    thresholds: Dict[str, float]
+    human_review: HumanReviewAuditOut
+
+    model_config = ConfigDict(
+        extra="allow"
+    )
 
 
 class CandidateScoreOut(BaseModel):
@@ -50,6 +90,7 @@ class CandidateScoreOut(BaseModel):
     experience_score: float
     skill_score: float
     education_score: float
+    scoring_policy_version: Optional[str] = None
 
 
 class RecruitmentDashboardOut(BaseModel):
