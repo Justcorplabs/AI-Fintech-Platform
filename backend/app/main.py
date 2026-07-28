@@ -20,24 +20,7 @@ from app.core.rate_limit import limiter
 from app.core.security_headers import (
     SecurityHeadersMiddleware,
 )
-from app.db.database import Base, engine
-
-# These imports ensure that SQLAlchemy registers all
-# application models in Base.metadata.
-from app.models.auth_audit_log import AuthAuditLog
-from app.models.fraud import (
-    Transaction,
-    TransactionAuditEvent,
-)
-from app.models.password_reset_token import (
-    PasswordResetToken,
-)
-from app.models.recruitment import (
-    CVApplication,
-    JobPost,
-)
-from app.models.refresh_token import RefreshToken
-from app.models.user import User
+from app.db.database import engine
 
 
 logging.basicConfig(
@@ -61,6 +44,10 @@ async def lifespan(
 ):
     """
     Manage application startup and shutdown operations.
+
+    Database schema changes are intentionally excluded
+    from the API lifecycle. Deployment startup must run
+    Alembic before Uvicorn starts accepting traffic.
     """
 
     logger.info(
@@ -69,23 +56,6 @@ async def lifespan(
         settings.APP_VERSION,
         settings.ENVIRONMENT,
     )
-
-    if settings.CREATE_DATABASE_TABLES:
-        try:
-            Base.metadata.create_all(
-                bind=engine
-            )
-
-            logger.info(
-                "Database tables verified."
-            )
-
-        except SQLAlchemyError:
-            logger.exception(
-                "Database table verification failed."
-            )
-
-            raise
 
     yield
 

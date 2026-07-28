@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     ]
 
     ENABLE_API_DOCS: bool = True
-    CREATE_DATABASE_TABLES: bool = True
+    CREATE_DATABASE_TABLES: bool = False
 
     DATABASE_POOL_PRE_PING: bool = True
     DATABASE_POOL_SIZE: int = 5
