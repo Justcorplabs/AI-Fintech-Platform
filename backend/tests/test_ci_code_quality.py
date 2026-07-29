@@ -160,3 +160,16 @@ def test_runtime_requirements_exclude_black():
     )
 
     assert "black" not in source.lower()
+
+
+def test_runtime_requirements_include_email_validator():
+    source = read_text(
+        BACKEND_ROOT
+        / "requirements.txt"
+    ).lower()
+
+    assert (
+        "email-validator"
+        in source
+    )
+
