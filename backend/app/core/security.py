@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 from uuid import uuid4
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
 from passlib.exc import UnknownHashError
 
@@ -109,13 +110,13 @@ def decode_access_token(token: str) -> dict[str, Any]:
     )
 
     if payload.get("token_type") != "access":
-        raise JWTError("Invalid token type.")
+        raise InvalidTokenError("Invalid token type.")
 
     if not payload.get("sub"):
-        raise JWTError("Token subject is missing.")
+        raise InvalidTokenError("Token subject is missing.")
 
     if not payload.get("jti"):
-        raise JWTError("Token identifier is missing.")
+        raise InvalidTokenError("Token identifier is missing.")
 
     return payload
 
@@ -133,13 +134,13 @@ def decode_refresh_token(token: str) -> dict[str, Any]:
     )
 
     if payload.get("token_type") != "refresh":
-        raise JWTError("Invalid token type.")
+        raise InvalidTokenError("Invalid token type.")
 
     if not payload.get("sub"):
-        raise JWTError("Token subject is missing.")
+        raise InvalidTokenError("Token subject is missing.")
 
     if not payload.get("jti"):
-        raise JWTError("Token identifier is missing.")
+        raise InvalidTokenError("Token identifier is missing.")
 
     return payload
 
@@ -159,5 +160,5 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
     """
     try:
         return decode_access_token(token)
-    except JWTError:
+    except InvalidTokenError:
         return None

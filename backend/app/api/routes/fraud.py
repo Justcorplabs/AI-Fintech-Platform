@@ -13,7 +13,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
-from jose import JWTError
+from jwt.exceptions import InvalidTokenError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 
@@ -93,7 +93,7 @@ def validate_websocket_token(
     """
 
     if not token:
-        raise JWTError(
+        raise InvalidTokenError(
             "Authentication token is missing."
         )
 
@@ -107,7 +107,7 @@ def validate_websocket_token(
     )
 
     if Permission.FRAUD_READ not in permissions:
-        raise JWTError(
+        raise InvalidTokenError(
             "User does not have fraud read permission."
         )
 
@@ -122,7 +122,7 @@ async def fraud_alert_socket(
     try:
         validate_websocket_token(token)
 
-    except JWTError:
+    except InvalidTokenError:
         await websocket.close(
             code=status.WS_1008_POLICY_VIOLATION,
             reason=(

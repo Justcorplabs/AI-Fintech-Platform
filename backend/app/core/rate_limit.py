@@ -3,7 +3,7 @@ import logging
 from typing import Final
 
 from fastapi import Request
-from jose import JWTError
+from jwt.exceptions import InvalidTokenError
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -67,7 +67,7 @@ def authenticated_user_key(request: Request) -> str:
                 return f"user:{user_id}"
 
         except (
-            JWTError,
+            InvalidTokenError,
             ValueError,
             TypeError,
             KeyError,

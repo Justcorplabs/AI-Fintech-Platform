@@ -9,7 +9,7 @@ from fastapi import (
     Response,
     status,
 )
-from jose import JWTError
+from jwt.exceptions import InvalidTokenError
 from sqlalchemy import select, update
 from sqlalchemy.exc import (
     IntegrityError,
@@ -621,7 +621,7 @@ def refresh_access_token(
             payload.refresh_token
         )
 
-    except JWTError:
+    except InvalidTokenError:
         create_auth_audit_log(
             db=db,
             event_type="refresh_failed",

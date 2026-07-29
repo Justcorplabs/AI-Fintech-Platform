@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError
+from jwt.exceptions import InvalidTokenError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -51,7 +51,7 @@ def get_current_user(
         payload = decode_access_token(credentials.credentials)
         user_id = UUID(str(payload["sub"]))
 
-    except (JWTError, ValueError, TypeError, KeyError):
+    except (InvalidTokenError, ValueError, TypeError, KeyError):
         raise credentials_exception()
 
     user = db.scalar(
