@@ -1,4 +1,4 @@
-﻿import json
+import json
 from pathlib import Path
 
 
@@ -100,3 +100,46 @@ def test_resume_router_excludes_fraud_routes():
 
     assert 'path="/fraud"' not in source
     assert 'path="/transactions"' not in source
+
+
+def test_frontends_use_patched_dependency_versions():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        package = read_package(frontend)
+
+        assert (
+            package["dependencies"][
+                "react-router-dom"
+            ]
+            == "7.18.2"
+        )
+
+        assert (
+            package["devDependencies"]["vite"]
+            == "8.1.5"
+        )
+
+        assert (
+            package["devDependencies"][
+                "@vitejs/plugin-react"
+            ]
+            == "6.0.4"
+        )
+
+
+def test_frontend_docker_builds_use_supported_node():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        dockerfile = read_text(
+            frontend / "Dockerfile"
+        )
+
+        assert (
+            "FROM node:20.19-alpine AS build"
+            in dockerfile
+        )
+
