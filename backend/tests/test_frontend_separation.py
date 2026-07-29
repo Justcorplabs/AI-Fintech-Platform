@@ -178,3 +178,100 @@ def test_frontends_do_not_depend_on_react_router_dom():
             "react-router-dom"
             not in package["dependencies"]
         )
+
+
+def test_frontends_exclude_cross_domain_source_files():
+    forbidden_fraud_paths = [
+        FRAUD_FRONTEND
+        / "src"
+        / "components"
+        / "recruitment",
+        FRAUD_FRONTEND
+        / "src"
+        / "pages"
+        / "Recruitment.jsx",
+        FRAUD_FRONTEND
+        / "src"
+        / "pages"
+        / "ResumeReviewer.jsx",
+    ]
+
+    forbidden_resume_paths = [
+        RESUME_FRONTEND
+        / "src"
+        / "components"
+        / "fraud",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Dashboard.jsx",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Fraud.jsx",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Transactions.jsx",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Investigation.jsx",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Analytics.jsx",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Reports.jsx",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "DriftMonitoring.jsx",
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Settings.jsx",
+    ]
+
+    for forbidden_path in (
+        forbidden_fraud_paths
+        + forbidden_resume_paths
+    ):
+        assert not forbidden_path.exists()
+
+
+def test_frontends_retain_their_domain_pages():
+    required_fraud_pages = [
+        "Dashboard.jsx",
+        "Fraud.jsx",
+        "Transactions.jsx",
+        "Investigation.jsx",
+        "Analytics.jsx",
+        "Reports.jsx",
+        "DriftMonitoring.jsx",
+        "Settings.jsx",
+    ]
+
+    required_resume_pages = [
+        "Recruitment.jsx",
+        "ResumeReviewer.jsx",
+    ]
+
+    for page_name in required_fraud_pages:
+        assert (
+            FRAUD_FRONTEND
+            / "src"
+            / "pages"
+            / page_name
+        ).is_file()
+
+    for page_name in required_resume_pages:
+        assert (
+            RESUME_FRONTEND
+            / "src"
+            / "pages"
+            / page_name
+        ).is_file()
+
