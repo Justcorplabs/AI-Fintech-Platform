@@ -230,59 +230,9 @@ jobs:
         run: |
           docker compose build --pull
 
-      - name: Start full stack
+      - name: Start full stack and wait for health
         run: |
-          docker compose up -d
-
-      - name: Wait for healthy services
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          services=(
-            db
-            backend
-            frontend
-          )
-
-          for attempt in $(seq 1 36); do
-            all_healthy=true
-
-            for service in "${services[@]}"; do
-              container_id="$(
-                docker compose ps -q "$service"
-              )"
-
-              if [ -z "$container_id" ]; then
-                all_healthy=false
-                continue
-              fi
-
-              health="$(
-                docker inspect \
-                  --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
-                  "$container_id"
-              )"
-
-              if [ "$health" != "healthy" ]; then
-                all_healthy=false
-              fi
-            done
-
-            if [ "$all_healthy" = true ]; then
-              break
-            fi
-
-            if [ "$attempt" -eq 36 ]; then
-              echo "Services did not become healthy."
-              docker compose ps
-              exit 1
-            fi
-
-            sleep 5
-          done
-
-          docker compose ps
+          docker compose up -d --wait --wait-timeout 180
 
       - name: Verify backend health response
         run: |
@@ -344,6 +294,4 @@ jobs:
       - name: Stop full stack
         if: always()
         run: |
-          docker compose down \
-            --volumes \
-            --remove-orphans
+          docker compose down --volumes --remove-orphans
