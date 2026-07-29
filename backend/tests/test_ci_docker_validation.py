@@ -172,3 +172,28 @@ def test_ci_always_collects_logs_and_cleans_up():
     assert source.count(
         "if: always()"
     ) >= 3
+
+
+def test_python_runtime_supports_declared_dependencies():
+    workflow_source = read_text(
+        CI_WORKFLOW
+    )
+
+    docker_source = read_text(
+        PROJECT_ROOT
+        / "backend"
+        / "Dockerfile"
+    )
+
+    assert (
+        workflow_source.count(
+            'python-version: "3.12"'
+        )
+        == 2
+    )
+
+    assert (
+        "FROM python:3.12-slim"
+        in docker_source
+    )
+
