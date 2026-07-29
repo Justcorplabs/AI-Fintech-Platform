@@ -44,7 +44,6 @@ pytest>=8.2
 
 pytest-asyncio>=0.23
 
-black>=24.4
 slowapi>=0.1.9
 limits>=5.3
 python-docx==1.2.0

@@ -14,6 +14,64 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backend-quality:
+    name: Backend code quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install quality dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Run syntax-critical Ruff checks
+        run: |
+          python -m ruff check app tests alembic
+
+      - name: Run high-confidence security scan
+        run: |
+          python -m bandit -r app -q -lll -iii
+
+      - name: Report Black formatting drift
+        continue-on-error: true
+        run: |
+          python -m black --check app tests alembic
+
+      - name: Audit runtime dependencies
+        continue-on-error: true
+        run: |
+          python -m pip_audit \
+            -r requirements.txt \
+            --progress-spinner off \
+            --format json \
+            --output pip-audit-report.json
+
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-pip-audit
+          path: backend/pip-audit-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
   backend-test:
     name: Backend migrations and tests
     runs-on: ubuntu-latest
