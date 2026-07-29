@@ -1,9 +1,9 @@
-﻿import {
+import {
   BrowserRouter,
   Navigate,
   Route,
   Routes,
-} from "react-router-dom";
+} from "react-router";
 import { Toaster } from "react-hot-toast";
 
 import Recruitment from "./pages/Recruitment";

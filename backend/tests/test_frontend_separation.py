@@ -111,9 +111,9 @@ def test_frontends_use_patched_dependency_versions():
 
         assert (
             package["dependencies"][
-                "react-router-dom"
+                "react-router"
             ]
-            == "6.30.4"
+            == "8.3.0"
         )
 
         assert (
@@ -139,6 +139,42 @@ def test_frontend_docker_builds_use_supported_node():
         )
 
         assert (
-            "FROM node:20.19-alpine AS build"
+            "FROM node:24.15-alpine AS build"
             in dockerfile
+        )
+
+
+def test_frontends_use_react_nineteen():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        package = read_package(frontend)
+
+        assert (
+            package["dependencies"]["react"]
+            == "19.2.8"
+        )
+
+        assert (
+            package["dependencies"]["react-dom"]
+            == "19.2.8"
+        )
+
+
+def test_frontends_do_not_depend_on_react_router_dom():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        package = read_package(frontend)
+
+        assert (
+            package["dependencies"]["react-router"]
+            == "8.3.0"
+        )
+
+        assert (
+            "react-router-dom"
+            not in package["dependencies"]
         )

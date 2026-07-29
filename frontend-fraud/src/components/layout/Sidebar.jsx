@@ -1,4 +1,4 @@
-﻿import {
+import {
   Activity,
   BarChart3,
   FileText,
@@ -8,7 +8,7 @@
   Settings,
   ShieldAlert,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router";
 
 const navigationItems = [
   {

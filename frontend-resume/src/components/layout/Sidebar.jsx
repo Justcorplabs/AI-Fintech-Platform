@@ -1,9 +1,9 @@
-﻿import {
+import {
   BriefcaseBusiness,
   FileSearch,
   ScanSearch,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink } from "react-router";
 
 const navigationItems = [
   {

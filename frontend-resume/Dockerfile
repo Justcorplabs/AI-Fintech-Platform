@@ -1,4 +1,4 @@
-FROM node:20.19-alpine AS build
+﻿FROM node:24.15-alpine AS build
 
 WORKDIR /app
 
@@ -24,3 +24,4 @@ EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD wget --quiet --tries=1 --spider http://localhost/ || exit 1
+
