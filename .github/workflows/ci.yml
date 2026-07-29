@@ -2,37 +2,153 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend-test:
+    name: Backend migrations and tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine
         env:
+          POSTGRES_USER: postgres
           POSTGRES_PASSWORD: password
           POSTGRES_DB: ai_fintech_test
+        ports:
+          - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
+          --health-cmd
+          "pg_isready -U postgres -d ai_fintech_test"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 12
+          --health-start-period 5s
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DATABASE_URL: >-
+        postgresql+psycopg2://postgres:password@localhost:5432/ai_fintech_test
+      SECRET_KEY: ci-test-secret-key-not-for-production
+      ENVIRONMENT: testing
+      DEBUG: "false"
+      CREATE_DATABASE_TABLES: "false"
+      ENABLE_API_DOCS: "false"
+      ALLOWED_ORIGINS: http://localhost:5173
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
       - name: Install dependencies
         run: |
-          cd backend
-          pip install -r requirements.txt
-      - name: Run tests
-        env:
-          DATABASE_URL: postgresql://postgres:password@localhost:5432/ai_fintech_test
-          SECRET_KEY: test-secret-key
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Validate migration graph
         run: |
-          cd backend
-          pytest tests/ -v
+          python -m compileall -q app alembic tests
+          python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+
+          config = Config("alembic.ini")
+          scripts = ScriptDirectory.from_config(config)
+          heads = scripts.get_heads()
+
+          if len(heads) != 1:
+              raise SystemExit(
+                  f"Expected exactly one Alembic head, found: {heads}"
+              )
+
+          print(f"Alembic head: {heads[0]}")
+          PY
+
+      - name: Apply migrations to clean database
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+          python -m alembic check
+
+      - name: Downgrade and verify cleanup
+        run: |
+          python -m alembic downgrade base
+          python - <<'PY'
+          from sqlalchemy import create_engine
+          from sqlalchemy import inspect
+          from sqlalchemy import text
+
+          from app.core.config import settings
+
+          engine = create_engine(settings.DATABASE_URL)
+
+          try:
+              inspector = inspect(engine)
+              tables = set(inspector.get_table_names())
+
+              unexpected_tables = tables - {"alembic_version"}
+
+              if unexpected_tables:
+                  raise SystemExit(
+                      "Downgrade left application tables behind: "
+                      f"{sorted(unexpected_tables)}"
+                  )
+
+              with engine.connect() as connection:
+                  enum_names = connection.execute(
+                      text(
+                          """
+                          SELECT typname
+                          FROM pg_type
+                          WHERE typname IN (
+                              'applicationstatus',
+                              'fraudstatus',
+                              'userrole'
+                          )
+                          ORDER BY typname
+                          """
+                      )
+                  ).scalars().all()
+
+              if enum_names:
+                  raise SystemExit(
+                      "Downgrade left application enum types behind: "
+                      f"{enum_names}"
+                  )
+
+              print("Downgrade cleanup verified.")
+
+          finally:
+              engine.dispose()
+          PY
+
+      - name: Reapply migrations and check drift
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+          python -m alembic check
+
+      - name: Run backend tests
+        run: |
+          python -m pytest tests -q
