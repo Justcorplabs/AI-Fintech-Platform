@@ -1,3 +1,4 @@
+import ast
 import importlib
 import json
 from pathlib import Path
@@ -153,12 +154,23 @@ def test_fraud_route_maps_missing_model_to_service_unavailable():
 
     assert "except ModelUnavailableError as exc:" in source
     assert "status.HTTP_503_SERVICE_UNAVAILABLE" in source
-    normalized_source = " ".join(
-        source.split()
-    )
+    tree = ast.parse(source)
+
+    string_constants = {
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(
+            node,
+            ast.Constant,
+        )
+        and isinstance(
+            node.value,
+            str,
+        )
+    }
 
     assert (
         "Fraud prediction model is "
         "temporarily unavailable."
-        in normalized_source
+        in string_constants
     )
