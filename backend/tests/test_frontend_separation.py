@@ -113,7 +113,7 @@ def test_frontends_use_patched_dependency_versions():
             package["dependencies"][
                 "react-router-dom"
             ]
-            == "7.18.2"
+            == "6.30.4"
         )
 
         assert (
@@ -142,4 +142,3 @@ def test_frontend_docker_builds_use_supported_node():
             "FROM node:20.19-alpine AS build"
             in dockerfile
         )
-
