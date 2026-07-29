@@ -153,8 +153,12 @@ def test_fraud_route_maps_missing_model_to_service_unavailable():
 
     assert "except ModelUnavailableError as exc:" in source
     assert "status.HTTP_503_SERVICE_UNAVAILABLE" in source
+    normalized_source = " ".join(
+        source.split()
+    )
+
     assert (
         "Fraud prediction model is "
         "temporarily unavailable."
-        in source
+        in normalized_source
     )
