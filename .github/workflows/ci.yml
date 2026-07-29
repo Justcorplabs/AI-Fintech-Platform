@@ -210,3 +210,140 @@ jobs:
       - name: Run backend tests
         run: |
           python -m pytest tests -q
+  docker-smoke:
+    name: Docker full-stack smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs:
+      - backend-quality
+      - backend-test
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate Compose configuration
+        run: |
+          docker compose config --quiet
+
+      - name: Build container images
+        run: |
+          docker compose build --pull
+
+      - name: Start full stack
+        run: |
+          docker compose up -d
+
+      - name: Wait for healthy services
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          services=(
+            db
+            backend
+            frontend
+          )
+
+          for attempt in $(seq 1 36); do
+            all_healthy=true
+
+            for service in "${services[@]}"; do
+              container_id="$(
+                docker compose ps -q "$service"
+              )"
+
+              if [ -z "$container_id" ]; then
+                all_healthy=false
+                continue
+              fi
+
+              health="$(
+                docker inspect \
+                  --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+                  "$container_id"
+              )"
+
+              if [ "$health" != "healthy" ]; then
+                all_healthy=false
+              fi
+            done
+
+            if [ "$all_healthy" = true ]; then
+              break
+            fi
+
+            if [ "$attempt" -eq 36 ]; then
+              echo "Services did not become healthy."
+              docker compose ps
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          docker compose ps
+
+      - name: Verify backend health response
+        run: |
+          python3 - <<'PY'
+          import json
+          from urllib.request import urlopen
+
+          with urlopen(
+              "http://localhost:8000/health",
+              timeout=10,
+          ) as response:
+              data = json.load(response)
+
+          if data.get("status") != "healthy":
+              raise SystemExit(
+                  f"Unexpected backend status: {data}"
+              )
+
+          if data.get("database") != "healthy":
+              raise SystemExit(
+                  f"Unexpected database status: {data}"
+              )
+
+          print("Backend health verified.")
+          PY
+
+      - name: Verify frontend response
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            http://localhost:5173/ \
+            > /dev/null
+
+      - name: Capture Compose status
+        if: always()
+        run: |
+          docker compose ps \
+            > docker-compose-status.txt
+
+      - name: Capture Compose logs
+        if: always()
+        run: |
+          docker compose logs --no-color \
+            > docker-compose.log
+
+      - name: Upload Docker diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-smoke-diagnostics
+          path: |
+            docker-compose-status.txt
+            docker-compose.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop full stack
+        if: always()
+        run: |
+          docker compose down \
+            --volumes \
+            --remove-orphans
