@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+from pathlib import Path
+from threading import RLock
 from typing import Any, Dict, List, Optional
 
 import joblib
@@ -8,6 +10,10 @@ import pandas as pd
 
 
 logger = logging.getLogger(__name__)
+
+
+class ModelUnavailableError(RuntimeError):
+    """Raised when fraud model artifacts are unavailable."""
 
 
 class FraudPredictor:
@@ -29,10 +35,26 @@ class FraudPredictor:
             default=False,
         )
 
-        self._load_artifacts()
+        self._artifacts_loaded = False
+        self._load_lock = RLock()
+
+        logger.info(
+            "Fraud predictor initialized with lazy artifact loading."
+        )
+        logger.info(
+            "Fraud demo mode enabled: %s",
+            self.allow_demo_mode,
+        )
+
+    @property
+    def is_loaded(self) -> bool:
+        return self._artifacts_loaded
 
     @staticmethod
-    def _read_boolean_env(name: str, default: bool = False) -> bool:
+    def _read_boolean_env(
+        name: str,
+        default: bool = False,
+    ) -> bool:
         value = os.getenv(name)
 
         if value is None:
@@ -46,87 +68,125 @@ class FraudPredictor:
             "enabled",
         }
 
-    def _project_root(self) -> str:
-        return os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../../../../")
-        )
+    def _project_root(self) -> Path:
+        return Path(__file__).resolve().parents[4]
+
+    def _required_artifact_paths(self) -> Dict[str, Path]:
+        root = self._project_root()
+        registry_dir = root / "ml" / "registry"
+        models_dir = root / "ml" / "models"
+
+        return {
+            "model": registry_dir / "champion_lightgbm_model.pkl",
+            "calibrator": registry_dir / "champion_isotonic_calibrator.pkl",
+            "explainer": models_dir / "shap_explainer.pkl",
+            "model_features": models_dir / "model_features.pkl",
+            "model_defaults": models_dir / "model_defaults.pkl",
+        }
+
+    def _ensure_artifacts_loaded(self) -> None:
+        if self._artifacts_loaded:
+            return
+
+        with self._load_lock:
+            if self._artifacts_loaded:
+                return
+
+            self._load_artifacts()
 
     def _load_artifacts(self) -> None:
         root = self._project_root()
+        required_paths = self._required_artifact_paths()
 
-        registry_dir = os.path.join(root, "ml", "registry")
-        models_dir = os.path.join(root, "ml", "models")
+        missing_paths = [
+            path
+            for path in required_paths.values()
+            if not path.is_file()
+        ]
 
-        self.model = joblib.load(
-            os.path.join(
-                registry_dir,
-                "champion_lightgbm_model.pkl",
-            )
-        )
-
-        self.calibrator = joblib.load(
-            os.path.join(
-                registry_dir,
-                "champion_isotonic_calibrator.pkl",
-            )
-        )
-
-        self.explainer = joblib.load(
-            os.path.join(
-                models_dir,
-                "shap_explainer.pkl",
-            )
-        )
-
-        self.model_features = joblib.load(
-            os.path.join(
-                models_dir,
-                "model_features.pkl",
-            )
-        )
-
-        self.model_defaults = joblib.load(
-            os.path.join(
-                models_dir,
-                "model_defaults.pkl",
-            )
-        )
-
-        metadata_path = os.path.join(
-            registry_dir,
-            "champion_model_card.json",
-        )
-
-        if os.path.exists(metadata_path):
-            with open(metadata_path, "r", encoding="utf-8") as file:
-                self.metadata = json.load(file)
-
-            self.model_version = self.metadata.get(
-                "model_version",
-                self.model_version,
+        if missing_paths:
+            missing_names = ", ".join(
+                path.name
+                for path in missing_paths
             )
 
-        encoders_path = os.path.join(
-            root,
-            "data",
-            "processed",
-            "label_encoders.pkl",
+            logger.error(
+                "Fraud model artifacts are missing: %s",
+                missing_names,
+            )
+
+            raise ModelUnavailableError(
+                "Fraud prediction model artifacts are unavailable."
+            )
+
+        registry_dir = root / "ml" / "registry"
+        metadata_path = registry_dir / "champion_model_card.json"
+        encoders_path = (
+            root
+            / "data"
+            / "processed"
+            / "label_encoders.pkl"
         )
 
-        if os.path.exists(encoders_path):
-            self.label_encoders = joblib.load(encoders_path)
+        try:
+            model = joblib.load(required_paths["model"])
+            calibrator = joblib.load(required_paths["calibrator"])
+            explainer = joblib.load(required_paths["explainer"])
+            model_features = joblib.load(
+                required_paths["model_features"]
+            )
+            model_defaults = joblib.load(
+                required_paths["model_defaults"]
+            )
+
+            metadata: Dict[str, Any] = {}
+
+            if metadata_path.is_file():
+                with metadata_path.open(
+                    "r",
+                    encoding="utf-8",
+                ) as file:
+                    metadata = json.load(file)
+
+            label_encoders = None
+
+            if encoders_path.is_file():
+                label_encoders = joblib.load(encoders_path)
+
+        except Exception as exc:
+            logger.exception(
+                "Fraud model artifacts could not be loaded."
+            )
+
+            raise ModelUnavailableError(
+                "Fraud prediction model artifacts could not be loaded."
+            ) from exc
+
+        # Assign only after the complete bundle loads successfully.
+        self.model = model
+        self.calibrator = calibrator
+        self.explainer = explainer
+        self.model_features = model_features
+        self.model_defaults = model_defaults
+        self.metadata = metadata
+        self.label_encoders = label_encoders
+
+        self.model_version = metadata.get(
+            "model_version",
+            self.model_version,
+        )
+        self._artifacts_loaded = True
 
         logger.info(
             "Champion fraud model loaded successfully: %s",
             self.model_version,
         )
 
-        logger.info(
-            "Fraud demo mode enabled: %s",
-            self.allow_demo_mode,
-        )
-
-    def _safe_encode(self, column: str, value: str) -> int:
+    def _safe_encode(
+        self,
+        column: str,
+        value: str,
+    ) -> int:
         if self.label_encoders is None:
             return 0
 
@@ -160,7 +220,6 @@ class FraudPredictor:
             return None
 
         profile = str(requested_profile).strip().lower()
-
         allowed_profiles = {"low", "medium", "high"}
 
         if profile not in allowed_profiles:
@@ -230,6 +289,16 @@ class FraudPredictor:
         data: Dict[str, Any],
         demo_profile: Optional[str] = None,
     ) -> pd.DataFrame:
+        if self.model_defaults is None:
+            raise ModelUnavailableError(
+                "Fraud model defaults are unavailable."
+            )
+
+        if self.model_features is None:
+            raise ModelUnavailableError(
+                "Fraud model feature definitions are unavailable."
+            )
+
         row = self.model_defaults.copy()
 
         if "TransactionAmt" in row.index:
@@ -261,7 +330,6 @@ class FraudPredictor:
             )
 
         features = pd.DataFrame([row])
-
         return features[self.model_features]
 
     def _get_risk_level(self, score: float) -> str:
@@ -285,10 +353,7 @@ class FraudPredictor:
             return min(score, 0.12)
 
         if profile == "medium":
-            return max(
-                min(score, 0.59),
-                0.42,
-            )
+            return max(min(score, 0.59), 0.42)
 
         if profile == "high":
             return max(score, 0.86)
@@ -300,6 +365,11 @@ class FraudPredictor:
         features: pd.DataFrame,
         top_n: int = 5,
     ) -> List[Dict[str, Any]]:
+        if self.explainer is None:
+            raise ModelUnavailableError(
+                "Fraud explanation model is unavailable."
+            )
+
         shap_values = self.explainer.shap_values(features)
 
         if isinstance(shap_values, list):
@@ -316,14 +386,10 @@ class FraudPredictor:
         )
 
         result["abs_impact"] = result["impact"].abs()
-
-        result = (
-            result.sort_values(
-                "abs_impact",
-                ascending=False,
-            )
-            .head(top_n)
-        )
+        result = result.sort_values(
+            "abs_impact",
+            ascending=False,
+        ).head(top_n)
 
         return [
             {
@@ -333,10 +399,7 @@ class FraudPredictor:
                     if isinstance(row["value"], (int, float))
                     else row["value"]
                 ),
-                "impact": round(
-                    float(row["impact"]),
-                    4,
-                ),
+                "impact": round(float(row["impact"]), 4),
                 "direction": (
                     "increases_risk"
                     if row["impact"] > 0
@@ -350,10 +413,14 @@ class FraudPredictor:
         self,
         transaction_data: Dict[str, Any],
     ) -> Dict[str, Any]:
-        demo_profile = self._get_demo_profile(
-            transaction_data
-        )
+        self._ensure_artifacts_loaded()
 
+        if self.calibrator is None:
+            raise ModelUnavailableError(
+                "Fraud calibration model is unavailable."
+            )
+
+        demo_profile = self._get_demo_profile(transaction_data)
         features = self._build_feature_row(
             transaction_data,
             demo_profile=demo_profile,
@@ -367,25 +434,18 @@ class FraudPredictor:
             calibrated_score,
             demo_profile,
         )
-
         risk_level = self._get_risk_level(fraud_score)
-
         is_fraud = fraud_score >= self.high_threshold
-
         version = self.model_version
 
         if demo_profile:
-            version = (
-                f"{self.model_version}-demo-{demo_profile}"
-            )
+            version = f"{self.model_version}-demo-{demo_profile}"
 
         return {
             "fraud_score": round(fraud_score, 4),
             "is_fraud": bool(is_fraud),
             "risk_level": risk_level,
-            "top_risk_factors": self._get_top_risk_factors(
-                features
-            ),
+            "top_risk_factors": self._get_top_risk_factors(features),
             "model_version": version,
         }
 

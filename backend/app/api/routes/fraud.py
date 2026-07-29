@@ -43,7 +43,10 @@ from app.schemas.fraud import (
 from app.services.fraud.connection_manager import (
     fraud_ws_manager,
 )
-from app.services.fraud.predictor import fraud_predictor
+from app.services.fraud.predictor import (
+    ModelUnavailableError,
+    fraud_predictor,
+)
 
 
 router = APIRouter(
@@ -166,9 +169,21 @@ async def predict_fraud(
         fraud_analyze_access
     ),
 ):
-    result = fraud_predictor.predict(
-        payload.model_dump()
-    )
+    try:
+        result = fraud_predictor.predict(
+            payload.model_dump()
+        )
+
+    except ModelUnavailableError as exc:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_503_SERVICE_UNAVAILABLE
+            ),
+            detail=(
+                "Fraud prediction model is "
+                "temporarily unavailable."
+            ),
+        ) from exc
 
     tx = Transaction(
         transaction_ref=payload.transaction_ref,
