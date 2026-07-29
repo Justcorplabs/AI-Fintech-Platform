@@ -103,3 +103,21 @@ def test_ci_verifies_enum_cleanup():
         "Downgrade cleanup verified."
         in source
     )
+
+
+def test_ci_serializes_allowed_origins_as_json():
+    source = (
+        PROJECT_ROOT
+        / ".github"
+        / "workflows"
+        / "ci.yml"
+    ).read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "ALLOWED_ORIGINS: "
+        """'["http://localhost:5173"]'"""
+        in source
+    )
+

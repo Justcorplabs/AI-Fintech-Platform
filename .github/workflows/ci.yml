@@ -106,7 +106,7 @@ jobs:
       DEBUG: "false"
       CREATE_DATABASE_TABLES: "false"
       ENABLE_API_DOCS: "false"
-      ALLOWED_ORIGINS: http://localhost:5173
+      ALLOWED_ORIGINS: '["http://localhost:5173"]'
 
     steps:
       - name: Check out repository
