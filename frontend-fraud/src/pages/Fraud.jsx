@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fraudAPI } from "../services/api";
+import { fraudAPI } from "../services/fraudApi";
 
 import TransactionForm from "../components/fraud/TransactionForm";
 import FraudGauge from "../components/fraud/FraudGauge";

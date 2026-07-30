@@ -14,7 +14,7 @@ import {
   CircleDot,
   Printer,
 } from "lucide-react";
-import { fraudAPI } from "../services/api";
+import { fraudAPI } from "../services/fraudApi";
 
 const featureLabels = {
   TransactionAmt: "Transaction Amount",

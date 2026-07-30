@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fraudAPI } from "../services/api";
+import { fraudAPI } from "../services/fraudApi";
 import {
   Activity,
   Brain,

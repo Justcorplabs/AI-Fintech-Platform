@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fraudAPI } from "../services/api";
+import { fraudAPI } from "../services/fraudApi";
 import {
   FileText,
   Download,

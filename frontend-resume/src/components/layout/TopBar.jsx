@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Bell, UserCircle, Brain } from "lucide-react";
-import { fraudAPI } from "../../services/api";
+import { fraudAPI } from "../../services/recruitmentApi";
 
 export default function TopBar() {
   const [metadata, setMetadata] = useState(null);

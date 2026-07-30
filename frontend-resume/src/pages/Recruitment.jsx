@@ -14,7 +14,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { recruitmentAPI } from "../services/api";
+import { recruitmentAPI } from "../services/recruitmentApi";
 
 export default function Recruitment() {
   const [dashboard, setDashboard] = useState(null);

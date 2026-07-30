@@ -13,7 +13,7 @@ import {
   CheckSquare,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { fraudAPI } from "../services/api";
+import { fraudAPI } from "../services/fraudApi";
 
 const PAGE_SIZE = 10;
 

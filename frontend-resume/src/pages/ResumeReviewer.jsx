@@ -2,7 +2,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { FileText } from "lucide-react";
 
-import { recruitmentAPI } from "../services/api";
+import { recruitmentAPI } from "../services/recruitmentApi";
 
 import ResumeUploadPanel from "../components/recruitment/ResumeUploadPanel";
 import ATSScoreCards from "../components/recruitment/ATSScoreCards";

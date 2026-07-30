@@ -275,3 +275,156 @@ def test_frontends_retain_their_domain_pages():
             / page_name
         ).is_file()
 
+
+def test_frontends_use_domain_specific_api_clients():
+    fraud_services = (
+        FRAUD_FRONTEND
+        / "src"
+        / "services"
+    )
+
+    resume_services = (
+        RESUME_FRONTEND
+        / "src"
+        / "services"
+    )
+
+    assert not (
+        fraud_services / "api.js"
+    ).exists()
+
+    assert not (
+        resume_services / "api.js"
+    ).exists()
+
+    assert (
+        fraud_services
+        / "fraudApi.js"
+    ).is_file()
+
+    assert (
+        resume_services
+        / "recruitmentApi.js"
+    ).is_file()
+
+    for services in (
+        fraud_services,
+        resume_services,
+    ):
+        assert (
+            services
+            / "httpClient.js"
+        ).is_file()
+
+        assert (
+            services
+            / "authStorage.js"
+        ).is_file()
+
+        assert (
+            services
+            / "authApi.js"
+        ).is_file()
+
+
+def test_frontend_api_clients_are_domain_isolated():
+    fraud_api = read_text(
+        FRAUD_FRONTEND
+        / "src"
+        / "services"
+        / "fraudApi.js"
+    )
+
+    recruitment_api = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "services"
+        / "recruitmentApi.js"
+    )
+
+    assert "/fraud/" in fraud_api
+    assert "/recruitment/" not in fraud_api
+
+    assert (
+        "/recruitment/"
+        in recruitment_api
+    )
+
+    assert "/fraud/" not in recruitment_api
+
+
+def test_frontends_use_distinct_auth_storage_keys():
+    fraud_storage = read_text(
+        FRAUD_FRONTEND
+        / "src"
+        / "services"
+        / "authStorage.js"
+    )
+
+    resume_storage = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "services"
+        / "authStorage.js"
+    )
+
+    assert (
+        "justcorp.fraud.access_token"
+        in fraud_storage
+    )
+
+    assert (
+        "justcorp.fraud.refresh_token"
+        in fraud_storage
+    )
+
+    assert (
+        "justcorp.resume.access_token"
+        in resume_storage
+    )
+
+    assert (
+        "justcorp.resume.refresh_token"
+        in resume_storage
+    )
+
+    assert (
+        'getItem("token")'
+        not in fraud_storage
+    )
+
+    assert (
+        'getItem("token")'
+        not in resume_storage
+    )
+
+
+def test_frontend_sources_do_not_import_mixed_api_client():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        source_root = (
+            frontend / "src"
+        )
+
+        for path in source_root.rglob("*"):
+            if (
+                not path.is_file()
+                or path.suffix
+                not in {
+                    ".js",
+                    ".jsx",
+                    ".ts",
+                    ".tsx",
+                }
+            ):
+                continue
+
+            source = read_text(path)
+
+            assert (
+                "services/api"
+                not in source
+            )
+
