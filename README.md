@@ -48,7 +48,8 @@ ai-fintech-platform/
 │   │       ├── fraud/      # ML predictor (Joe)
 │   │       └── recruitment/# CV parser (Partner)
 │   └── main.py
-├── frontend/               # React + Vite (Partner)
+├── frontend-fraud/         # Fraud detection frontend
+├── frontend-resume/        # Resume intelligence frontend
 ├── docker-compose.yml
 └── README.md
 ```

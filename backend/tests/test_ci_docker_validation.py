@@ -4,25 +4,32 @@ from pathlib import Path
 PROJECT_ROOT = (
     Path(__file__).resolve().parents[2]
 )
+
 CI_WORKFLOW = (
     PROJECT_ROOT
     / ".github"
     / "workflows"
     / "ci.yml"
 )
+
 COMPOSE_FILE = (
     PROJECT_ROOT
     / "docker-compose.yml"
 )
-FRONTEND_DOCKERFILE = (
+
+FRAUD_FRONTEND = (
     PROJECT_ROOT
-    / "frontend"
-    / "Dockerfile"
+    / "frontend-fraud"
 )
-FRONTEND_NGINX = (
+
+RESUME_FRONTEND = (
+    PROJECT_ROOT
+    / "frontend-resume"
+)
+
+LEGACY_FRONTEND = (
     PROJECT_ROOT
     / "frontend"
-    / "nginx.conf"
 )
 
 
@@ -40,12 +47,12 @@ def test_compose_does_not_require_local_env_file():
     )
 
     assert "env_file:" not in source
+
     assert (
         "SECRET_KEY: "
         "docker-development-secret-key"
         in source
     )
-
 
 
 def test_compose_defines_all_service_health_checks():
@@ -57,79 +64,112 @@ def test_compose_defines_all_service_health_checks():
         "healthcheck:"
     ) == 4
 
-    assert (
-        "\n  db:\n"
-        in source
-    )
+    for service_name in (
+        "db",
+        "backend",
+        "fraud-frontend",
+        "resume-frontend",
+    ):
+        assert (
+            f"\n  {service_name}:\n"
+            in source
+        )
 
-    assert (
-        "\n  backend:\n"
-        in source
-    )
 
-    assert (
-        "\n  fraud-frontend:\n"
-        in source
-    )
-
-    assert (
-        "\n  resume-frontend:\n"
-        in source
-    )
-
-def test_compose_uses_production_frontend_port():
+def test_compose_uses_separate_frontend_ports():
     source = read_text(
         COMPOSE_FILE
     )
 
     assert '"5173:80"' in source
-
-
-def test_frontend_uses_multistage_build():
-    source = read_text(
-        FRONTEND_DOCKERFILE
-    )
+    assert '"5174:80"' in source
 
     assert (
-        "FROM node:20-alpine AS build"
+        "context: ./frontend-fraud"
         in source
     )
+
     assert (
-        "FROM nginx:1.27-alpine AS runtime"
-        in source
-    )
-    assert "npm run build" in source
-    assert (
-        "COPY --from=build /app/dist"
+        "context: ./frontend-resume"
         in source
     )
 
 
-def test_frontend_build_supports_lockfile_or_fallback():
-    source = read_text(
-        FRONTEND_DOCKERFILE
-    )
+def test_frontends_use_multistage_builds():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        source = read_text(
+            frontend / "Dockerfile"
+        )
 
-    assert "package-lock.json" in source
-    assert "npm ci" in source
-    assert "npm install" in source
+        assert (
+            "FROM node:24.15-alpine "
+            "AS build"
+            in source
+        )
+
+        assert (
+            "FROM nginx:1.27-alpine "
+            "AS runtime"
+            in source
+        )
+
+        assert "npm run build" in source
+
+        assert (
+            "COPY --from=build "
+            "/app/dist"
+            in source
+        )
 
 
-def test_nginx_supports_spa_and_api_proxy():
-    source = read_text(
-        FRONTEND_NGINX
-    )
+def test_frontend_builds_use_lockfiles():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        source = read_text(
+            frontend / "Dockerfile"
+        )
 
-    assert (
-        "try_files $uri $uri/ /index.html;"
-        in source
-    )
-    assert "location /api/" in source
-    assert (
-        "proxy_pass http://backend:8000/api/;"
-        in source
-    )
+        assert "package-lock.json" in source
+        assert "npm ci" in source
 
+
+def test_frontend_nginx_supports_spa_api_and_websockets():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        source = read_text(
+            frontend / "nginx.conf"
+        )
+
+        assert (
+            "try_files $uri $uri/ "
+            "/index.html;"
+            in source
+        )
+
+        assert "location /api/" in source
+
+        assert (
+            "proxy_pass "
+            "http://backend:8000;"
+            in source
+        )
+
+        assert (
+            "proxy_set_header Upgrade"
+            in source
+        )
+
+        assert (
+            "location = /health"
+            in source
+        )
 
 
 def test_ci_has_docker_smoke_job():
@@ -161,17 +201,8 @@ def test_ci_has_docker_smoke_job():
         in source
     )
 
-    assert (
-        "Verify fraud frontend response"
-        in source
-    )
 
-    assert (
-        "Verify resume frontend response"
-        in source
-    )
-
-def test_ci_verifies_backend_and_frontend():
+def test_ci_verifies_backend_and_both_frontends():
     source = read_text(
         CI_WORKFLOW
     )
@@ -180,16 +211,35 @@ def test_ci_verifies_backend_and_frontend():
         "http://localhost:8000/health"
         in source
     )
+
+    assert (
+        "Verify fraud frontend response"
+        in source
+    )
+
     assert (
         "http://localhost:5173/"
         in source
     )
+
+    assert (
+        "Verify resume frontend response"
+        in source
+    )
+
+    assert (
+        "http://localhost:5174/"
+        in source
+    )
+
     assert (
         'data.get("status") != "healthy"'
         in source
     )
+
     assert (
-        'data.get("database") != "healthy"'
+        'data.get("database") != '
+        '"healthy"'
         in source
     )
 
@@ -203,11 +253,13 @@ def test_ci_always_collects_logs_and_cleans_up():
         "docker compose logs --no-color"
         in source
     )
+
     assert (
         "docker compose down "
         "--volumes --remove-orphans"
         in source
     )
+
     assert source.count(
         "if: always()"
     ) >= 3
@@ -234,4 +286,22 @@ def test_python_runtime_supports_declared_dependencies():
     assert (
         "FROM python:3.12-slim"
         in docker_source
+    )
+
+
+def test_legacy_combined_frontend_is_removed():
+    assert not LEGACY_FRONTEND.exists()
+
+    compose = read_text(
+        COMPOSE_FILE
+    )
+
+    assert (
+        "\n  frontend:\n"
+        not in compose
+    )
+
+    assert (
+        "context: ./frontend\n"
+        not in compose
     )
