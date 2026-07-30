@@ -62,10 +62,12 @@ services:
         condition: service_healthy
     healthcheck:
       test:
-        - CMD-SHELL
-        - >-
-          wget -qO- http://localhost/health |
-          grep -q '^healthy$'
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://127.0.0.1/health
       interval: 5s
       timeout: 5s
       retries: 12
@@ -81,10 +83,12 @@ services:
         condition: service_healthy
     healthcheck:
       test:
-        - CMD-SHELL
-        - >-
-          wget -qO- http://localhost/health |
-          grep -q '^healthy$'
+        - CMD
+        - wget
+        - --quiet
+        - --tries=1
+        - --spider
+        - http://127.0.0.1/health
       interval: 5s
       timeout: 5s
       retries: 12

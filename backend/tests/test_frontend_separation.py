@@ -633,22 +633,17 @@ def test_compose_frontend_healthchecks_use_nginx_health_endpoint():
 
     assert (
         compose.count(
-            "http://localhost/health"
+            "http://127.0.0.1/health"
         )
         == 2
     )
 
     assert (
-        compose.count(
-            "grep -q '^healthy$'"
-        )
+        compose.count("--spider")
         == 2
     )
 
     assert (
-        compose.count(
-            "wget -qO-"
-        )
-        == 2
+        "http://localhost/health"
+        not in compose
     )
-
