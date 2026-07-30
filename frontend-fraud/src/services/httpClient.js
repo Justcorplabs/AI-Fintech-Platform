@@ -5,8 +5,14 @@ import {
   getAccessToken,
 } from "./authStorage";
 
+const apiOrigin = (
+  import.meta.env.VITE_API_BASE_URL || ""
+).replace(/\/+$/, "");
+
+const apiBaseURL = `${apiOrigin}/api/v1`;
+
 const httpClient = axios.create({
-  baseURL: "/api/v1",
+  baseURL: apiBaseURL,
   headers: {
     "Content-Type": "application/json",
   },

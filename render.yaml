@@ -1,0 +1,123 @@
+# yaml-language-server: $schema=https://render.com/schema/render.yaml.json
+
+services:
+  - type: web
+    name: justcorplabs-ai-fintech-api
+    runtime: docker
+    branch: dev
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile.render
+    dockerContext: .
+    autoDeployTrigger: checksPass
+    healthCheckPath: /health
+    buildFilter:
+      paths:
+        - backend/**
+        - ml/registry/**
+        - ml/models/*.pkl
+        - data/processed/label_encoders.pkl
+        - .dockerignore
+        - render.yaml
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+
+      - key: DEBUG
+        value: "false"
+
+      - key: CREATE_DATABASE_TABLES
+        value: "false"
+
+      - key: ENABLE_API_DOCS
+        value: "true"
+
+      - key: DATABASE_URL
+        fromDatabase:
+          name: justcorplabs-ai-fintech-db
+          property: connectionString
+
+      - key: SECRET_KEY
+        generateValue: true
+
+      - key: ALLOWED_ORIGINS
+        value: >-
+          ["https://justcorplabs-fraud-intelligence.onrender.com",
+          "https://justcorplabs-resume-intelligence.onrender.com"]
+
+      - key: FRONTEND_URL
+        value: >-
+          https://justcorplabs-fraud-intelligence.onrender.com
+
+      - key: ALLOW_FRAUD_DEMO_MODE
+        value: "false"
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      - key: DATABASE_POOL_PRE_PING
+        value: "true"
+
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+
+      - key: DATABASE_MAX_OVERFLOW
+        value: "5"
+
+      - key: DATABASE_POOL_RECYCLE_SECONDS
+        value: "300"
+
+  - type: web
+    name: justcorplabs-fraud-intelligence
+    runtime: static
+    branch: dev
+    rootDir: frontend-fraud
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - frontend-fraud/**
+        - render.yaml
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: justcorplabs-ai-fintech-api
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  - type: web
+    name: justcorplabs-resume-intelligence
+    runtime: static
+    branch: dev
+    rootDir: frontend-resume
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - frontend-resume/**
+        - render.yaml
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: justcorplabs-ai-fintech-api
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+databases:
+  - name: justcorplabs-ai-fintech-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "16"
+    databaseName: ai_fintech_db
+    user: ai_fintech_user
+    ipAllowList: []

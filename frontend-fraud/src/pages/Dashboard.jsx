@@ -87,9 +87,17 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const apiOrigin = (
+      import.meta.env.VITE_API_BASE_URL ||
+      window.location.origin
+    ).replace(/\/+$/, "");
+
+    const websocketOrigin = apiOrigin
+      .replace(/^http:/, "ws:")
+      .replace(/^https:/, "wss:");
+
     const socket = new WebSocket(
-      `${protocol}://${window.location.host}/api/v1/fraud/ws/alerts`
+      `${websocketOrigin}/api/v1/fraud/ws/alerts`
     );
 
     socket.onopen = () => {

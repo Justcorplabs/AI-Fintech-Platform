@@ -1,0 +1,45 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+
+WORKDIR /app
+
+COPY backend/requirements.txt /app/requirements.txt
+
+RUN pip install --no-cache-dir \
+    -r /app/requirements.txt
+
+COPY backend/ /app/
+
+COPY ml/registry/champion_model_card.json \
+    /ml/registry/champion_model_card.json
+
+COPY ml/registry/model_registry.csv \
+    /ml/registry/model_registry.csv
+
+COPY ml/registry/model_metadata.json \
+    /ml/registry/model_metadata.json
+
+COPY ml/registry/champion_lightgbm_model.pkl \
+    /ml/registry/champion_lightgbm_model.pkl
+
+COPY ml/registry/champion_isotonic_calibrator.pkl \
+    /ml/registry/champion_isotonic_calibrator.pkl
+
+COPY ml/models/shap_explainer.pkl \
+    /ml/models/shap_explainer.pkl
+
+COPY ml/models/model_features.pkl \
+    /ml/models/model_features.pkl
+
+COPY ml/models/model_defaults.pkl \
+    /ml/models/model_defaults.pkl
+
+COPY data/processed/label_encoders.pkl \
+    /data/processed/label_encoders.pkl
+
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["sh", "/app/entrypoint.sh"]
