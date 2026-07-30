@@ -428,3 +428,89 @@ def test_frontend_sources_do_not_import_mixed_api_client():
                 not in source
             )
 
+
+def test_frontend_sources_exclude_cross_domain_api_symbols():
+    fraud_source_root = (
+        FRAUD_FRONTEND / "src"
+    )
+
+    resume_source_root = (
+        RESUME_FRONTEND / "src"
+    )
+
+    fraud_sources = []
+
+    for path in fraud_source_root.rglob("*"):
+        if (
+            path.is_file()
+            and path.suffix
+            in {
+                ".js",
+                ".jsx",
+                ".ts",
+                ".tsx",
+            }
+        ):
+            fraud_sources.append(
+                read_text(path)
+            )
+
+    resume_sources = []
+
+    for path in resume_source_root.rglob("*"):
+        if (
+            path.is_file()
+            and path.suffix
+            in {
+                ".js",
+                ".jsx",
+                ".ts",
+                ".tsx",
+            }
+        ):
+            resume_sources.append(
+                read_text(path)
+            )
+
+    fraud_source = "\n".join(
+        fraud_sources
+    )
+
+    resume_source = "\n".join(
+        resume_sources
+    )
+
+    assert (
+        "recruitmentAPI"
+        not in fraud_source
+    )
+
+    assert (
+        "fraudAPI"
+        not in resume_source
+    )
+
+    assert (
+        "getModelMetadata"
+        not in resume_source
+    )
+
+
+def test_resume_topbar_is_recruitment_specific():
+    topbar = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "components"
+        / "layout"
+        / "TopBar.jsx"
+    )
+
+    assert (
+        "JustCorp Resume Intelligence"
+        in topbar
+    )
+
+    assert "Recruiter" in topbar
+    assert "Fraud Analyst" not in topbar
+    assert "ROC-AUC" not in topbar
+
