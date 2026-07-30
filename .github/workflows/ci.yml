@@ -106,7 +106,7 @@ jobs:
       DEBUG: "false"
       CREATE_DATABASE_TABLES: "false"
       ENABLE_API_DOCS: "false"
-      ALLOWED_ORIGINS: '["http://localhost:5173"]'
+      ALLOWED_ORIGINS: '["http://localhost:5173","http://localhost:5174"]'
 
     steps:
       - name: Check out repository
@@ -210,8 +210,9 @@ jobs:
       - name: Run backend tests
         run: |
           python -m pytest tests -q
+
   docker-smoke:
-    name: Docker full-stack smoke test
+    name: Docker separated frontends smoke test
     runs-on: ubuntu-latest
     timeout-minutes: 35
     needs:
@@ -259,13 +260,22 @@ jobs:
           print("Backend health verified.")
           PY
 
-      - name: Verify frontend response
+      - name: Verify fraud frontend response
         run: |
           curl \
             --fail \
             --silent \
             --show-error \
             http://localhost:5173/ \
+            > /dev/null
+
+      - name: Verify resume frontend response
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            http://localhost:5174/ \
             > /dev/null
 
       - name: Capture Compose status

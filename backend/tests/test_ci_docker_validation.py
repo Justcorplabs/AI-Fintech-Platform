@@ -47,6 +47,7 @@ def test_compose_does_not_require_local_env_file():
     )
 
 
+
 def test_compose_defines_all_service_health_checks():
     source = read_text(
         COMPOSE_FILE
@@ -54,12 +55,27 @@ def test_compose_defines_all_service_health_checks():
 
     assert source.count(
         "healthcheck:"
-    ) == 3
+    ) == 4
+
     assert (
-        "condition: service_healthy"
+        "\n  db:\n"
         in source
     )
 
+    assert (
+        "\n  backend:\n"
+        in source
+    )
+
+    assert (
+        "\n  fraud-frontend:\n"
+        in source
+    )
+
+    assert (
+        "\n  resume-frontend:\n"
+        in source
+    )
 
 def test_compose_uses_production_frontend_port():
     source = read_text(
@@ -115,22 +131,45 @@ def test_nginx_supports_spa_and_api_proxy():
     )
 
 
+
 def test_ci_has_docker_smoke_job():
     source = read_text(
         CI_WORKFLOW
     )
 
     assert "docker-smoke:" in source
+
     assert (
-        "name: Docker full-stack smoke test"
+        "name: Docker separated "
+        "frontends smoke test"
         in source
     )
+
+    assert (
+        "docker compose config --quiet"
+        in source
+    )
+
     assert (
         "docker compose build --pull"
         in source
     )
-    assert "docker compose up -d" in source
 
+    assert (
+        "docker compose up -d "
+        "--wait --wait-timeout 180"
+        in source
+    )
+
+    assert (
+        "Verify fraud frontend response"
+        in source
+    )
+
+    assert (
+        "Verify resume frontend response"
+        in source
+    )
 
 def test_ci_verifies_backend_and_frontend():
     source = read_text(
@@ -196,4 +235,3 @@ def test_python_runtime_supports_declared_dependencies():
         "FROM python:3.12-slim"
         in docker_source
     )
-

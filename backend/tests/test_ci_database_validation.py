@@ -105,6 +105,7 @@ def test_ci_verifies_enum_cleanup():
     )
 
 
+
 def test_ci_serializes_allowed_origins_as_json():
     source = (
         PROJECT_ROOT
@@ -115,9 +116,10 @@ def test_ci_serializes_allowed_origins_as_json():
         encoding="utf-8"
     )
 
-    assert (
+    expected_origins = (
         "ALLOWED_ORIGINS: "
-        """'["http://localhost:5173"]'"""
-        in source
+        "'[\"http://localhost:5173\","
+        "\"http://localhost:5174\"]'"
     )
 
+    assert expected_origins in source

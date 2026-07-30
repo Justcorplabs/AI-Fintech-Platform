@@ -514,3 +514,113 @@ def test_resume_topbar_is_recruitment_specific():
     assert "Fraud Analyst" not in topbar
     assert "ROC-AUC" not in topbar
 
+
+def test_compose_defines_separate_frontend_services():
+    compose = read_text(
+        PROJECT_ROOT
+        / "docker-compose.yml"
+    )
+
+    assert "\n  fraud-frontend:\n" in compose
+    assert "\n  resume-frontend:\n" in compose
+
+    assert (
+        "context: ./frontend-fraud"
+        in compose
+    )
+
+    assert (
+        "context: ./frontend-resume"
+        in compose
+    )
+
+    assert '"5173:80"' in compose
+    assert '"5174:80"' in compose
+
+    assert "\n  frontend:\n" not in compose
+
+
+def test_compose_allows_both_frontend_origins():
+    compose = read_text(
+        PROJECT_ROOT
+        / "docker-compose.yml"
+    )
+
+    assert (
+        "http://localhost:5173"
+        in compose
+    )
+
+    assert (
+        "http://localhost:5174"
+        in compose
+    )
+
+
+def test_frontend_nginx_configs_proxy_backend_and_spa_routes():
+    for frontend in (
+        FRAUD_FRONTEND,
+        RESUME_FRONTEND,
+    ):
+        nginx = read_text(
+            frontend / "nginx.conf"
+        )
+
+        assert (
+            "proxy_pass http://backend:8000"
+            in nginx
+        )
+
+        assert (
+            "proxy_set_header Upgrade"
+            in nginx
+        )
+
+        assert (
+            "try_files $uri $uri/ /index.html"
+            in nginx
+        )
+
+        assert "location = /health" in nginx
+
+
+def test_ci_smoke_tests_both_frontends():
+    workflow = read_text(
+        PROJECT_ROOT
+        / ".github"
+        / "workflows"
+        / "ci.yml"
+    )
+
+    assert (
+        "Docker separated frontends "
+        "smoke test"
+        in workflow
+    )
+
+    assert (
+        "Verify fraud frontend response"
+        in workflow
+    )
+
+    assert (
+        "Verify resume frontend response"
+        in workflow
+    )
+
+    assert (
+        "http://localhost:5173/"
+        in workflow
+    )
+
+    assert (
+        "http://localhost:5174/"
+        in workflow
+    )
+
+    assert (
+        "'[\"http://localhost:5173\","
+        "\"http://localhost:5174\"]'"
+        in workflow
+    )
+
