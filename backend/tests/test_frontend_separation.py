@@ -624,3 +624,31 @@ def test_ci_smoke_tests_both_frontends():
         in workflow
     )
 
+
+def test_compose_frontend_healthchecks_use_nginx_health_endpoint():
+    compose = read_text(
+        PROJECT_ROOT
+        / "docker-compose.yml"
+    )
+
+    assert (
+        compose.count(
+            "http://localhost/health"
+        )
+        == 2
+    )
+
+    assert (
+        compose.count(
+            "grep -q '^healthy$'"
+        )
+        == 2
+    )
+
+    assert (
+        compose.count(
+            "wget -qO-"
+        )
+        == 2
+    )
+
