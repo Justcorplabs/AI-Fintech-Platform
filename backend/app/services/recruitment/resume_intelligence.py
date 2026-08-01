@@ -23,6 +23,10 @@ class ResumeIntelligence:
             "key skills",
             "professional skills",
             "areas of expertise",
+            "strengths",
+            "key strengths",
+            "selected strengths",
+            "selected strengths for artificial intelligence engineering",
         ],
         "experience": [
             "experience",
@@ -41,6 +45,9 @@ class ResumeIntelligence:
             "qualifications",
             "academic qualifications",
             "education and qualifications",
+            "education and training",
+            "education & training",
+            "academic qualifications and training",
         ],
         "projects": [
             "projects",
@@ -65,6 +72,10 @@ class ResumeIntelligence:
             "references",
             "referees",
             "professional references",
+            "languages and references",
+            "languages & references",
+            "languages and referees",
+            "referees and languages",
         ],
     }
 

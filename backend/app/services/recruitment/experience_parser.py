@@ -29,6 +29,32 @@ class ExperienceParser:
         "environmental management agency", "nutrition action zimbabwe",
     ]
 
+    SECTION_BOUNDARIES = {
+        "education",
+        "education and training",
+        "education & training",
+        "academic background",
+        "academic qualifications",
+        "qualifications",
+        "certifications",
+        "certificates",
+        "professional training",
+        "projects",
+        "academic projects",
+        "selected strengths",
+        "selected strengths for artificial intelligence engineering",
+        "skills",
+        "technical skills",
+        "languages",
+        "languages and references",
+        "languages & references",
+        "references",
+        "referees",
+        "professional references",
+        "interests",
+        "additional information",
+    }
+
     def parse(self, lines: List[str]) -> List[Dict[str, Any]]:
         logical_lines = self._join_wrapped_lines(lines)
 
@@ -40,6 +66,9 @@ class ExperienceParser:
         i = 0
         while i < len(logical_lines):
             line = logical_lines[i]
+
+            if self._is_section_boundary(line):
+                break
 
             if self._is_noise(line):
                 i += 1
@@ -132,6 +161,9 @@ class ExperienceParser:
             starts_new_role = self._looks_like_role(line)
             starts_new_org = self._looks_like_organisation(line)
             has_date = bool(self._extract_period(line))
+            starts_section_boundary = (
+                self._is_section_boundary(line)
+            )
 
             previous_looks_open = (
                 not previous.endswith((".", ":", ";"))
@@ -142,7 +174,13 @@ class ExperienceParser:
                 ("problem solved:", "approach:", "results:", "recommendation:", "tools and methods:")
             )
 
-            if starts_new_bullet or starts_new_role or starts_new_org or has_date:
+            if (
+                starts_new_bullet
+                or starts_new_role
+                or starts_new_org
+                or has_date
+                or starts_section_boundary
+            ):
                 output.append(line)
             elif previous_looks_open or is_label_continuation:
                 output[-1] = previous + " " + line
@@ -265,6 +303,24 @@ class ExperienceParser:
             return False
 
         return any(word in lower for word in self.ORG_WORDS)
+
+    def _is_section_boundary(
+        self,
+        line: str,
+    ) -> bool:
+        clean = re.sub(
+            r"[^a-zA-Z&/ ]",
+            "",
+            str(line or ""),
+        )
+
+        clean = re.sub(
+            r"\s+",
+            " ",
+            clean,
+        ).strip().lower()
+
+        return clean in self.SECTION_BOUNDARIES
 
     def _is_noise(self, line: str) -> bool:
         lower = line.lower().strip()

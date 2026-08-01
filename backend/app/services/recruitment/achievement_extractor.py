@@ -122,42 +122,97 @@ class AchievementExtractor:
 
         return best_category
 
-    def _rewrite_achievement(self, text: str, category: str) -> str:
+    def _rewrite_achievement(
+        self,
+        text: str,
+        category: str,
+    ) -> str:
+        del category
+
         clean = self._clean(text)
-        metrics = self.METRIC_PATTERN.findall(clean)
+        metrics = self.METRIC_PATTERN.findall(
+            clean
+        )
 
         if not clean:
             return ""
 
-        if category == "financial":
-            prefix = "Supported financial reporting, reconciliation and records management"
-        elif category == "data":
-            prefix = "Applied data analysis and reporting techniques"
-        elif category == "monitoring_evaluation":
-            prefix = "Supported monitoring, evaluation and learning activities"
-        elif category == "technical":
-            prefix = "Applied technical tools and analytical methods"
-        elif category == "operations":
-            prefix = "Maintained accurate records and operational documentation"
-        else:
-            prefix = "Delivered practical support across assigned responsibilities"
+        lower = clean.lower()
 
-        if clean.lower().startswith((
-            "achieved", "improved", "increased", "reduced", "developed", "built",
-            "created", "implemented", "analysed", "analyzed", "prepared", "maintained",
-            "processed", "supported", "coordinated", "managed", "verified", "captured",
-            "reported", "presented", "monitored", "evaluated", "conducted", "generated",
-        )):
+        action_verbs = tuple(
+            self.ACTION_WORDS
+        ) + (
+            "applied",
+            "contributed",
+            "participated",
+            "performed",
+            "validated",
+        )
+
+        if lower.startswith(action_verbs):
             rewritten = clean
+
         else:
-            rewritten = f"{prefix}."
+            evidence_patterns = [
+                (
+                    r"^(?:data cleaning|"
+                    r"data validation|"
+                    r"data analysis)\b",
+                    "Performed ",
+                ),
+                (
+                    r"^(?:dashboard|dashboards|"
+                    r"dashboard inputs?)\b",
+                    "Prepared ",
+                ),
+                (
+                    r"^(?:report|reports|reporting)\b",
+                    "Prepared ",
+                ),
+                (
+                    r"^(?:field verification|"
+                    r"verification activities)\b",
+                    "Participated in ",
+                ),
+            ]
+
+            first_lower = (
+                clean[0].lower() + clean[1:]
+            )
+
+            rewritten = ""
+
+            for pattern, prefix in evidence_patterns:
+                if re.match(
+                    pattern,
+                    lower,
+                    flags=re.IGNORECASE,
+                ):
+                    rewritten = (
+                        prefix + first_lower
+                    )
+                    break
+
+            if not rewritten:
+                # Keep the actual candidate evidence.
+                # Do not replace it with a generic,
+                # category-based achievement.
+                rewritten = (
+                    clean[0].upper()
+                    + clean[1:]
+                )
 
         if metrics:
             for metric in metrics:
                 if metric not in rewritten:
-                    rewritten = rewritten.rstrip(".") + f" ({metric})."
+                    rewritten = (
+                        rewritten.rstrip(".")
+                        + f" ({metric})."
+                    )
 
-        return self._final_clean(rewritten)
+        return self._final_clean(
+            rewritten
+        )
 
     def _clean(self, text: str) -> str:
         value = str(text or "").strip()

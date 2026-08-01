@@ -4,6 +4,57 @@ import re
 
 class SemanticMatcher:
     SEMANTIC_MAP = {
+        "data analysis": [
+            "data analytics",
+            "statistical analysis",
+            "exploratory data analysis",
+            "data cleaning",
+            "data cleansing",
+            "data validation",
+            "cleaned datasets",
+            "validated datasets",
+            "cleaned and validated datasets",
+            "analysed data",
+            "analyzed data",
+        ],
+        "analytical": [
+            "analysis",
+            "data analysis",
+            "statistical analysis",
+            "analytical methods",
+            "model evaluation",
+            "identified data inconsistencies",
+            "identified and corrected data inconsistencies",
+        ],
+        "problem solving": [
+            "problem-solving",
+            "troubleshooting",
+            "resolved issues",
+            "corrected data inconsistencies",
+            "identified and corrected data inconsistencies",
+            "debugging",
+            "root cause analysis",
+        ],
+        "team": [
+            "teamwork",
+            "collaboration",
+            "collaborative",
+            "collaborated",
+            "worked with technical teams",
+            "collaborated with technical teams",
+            "cross-functional team",
+        ],
+        "forecasting": [
+            "forecast",
+            "forecasts",
+            "predictive analysis",
+            "predictive analytics",
+            "predictive modelling",
+            "predictive modeling",
+            "prediction model",
+            "crop yield prediction",
+            "time series",
+        ],
         "statistics": [
             "statistical analysis",
             "statistical modelling",
@@ -83,6 +134,12 @@ class SemanticMatcher:
             "front desk",
             "liaison",
             "participant support",
+            "presented findings",
+            "prepared reports",
+            "report writing",
+            "user training",
+            "technical presentations",
+            "communicated findings",
         ],
         "planning": [
             "implementation planning",
@@ -377,18 +434,72 @@ class SemanticMatcher:
         total = sum(result.get("confidence", 0) for result in results)
         return round(total / len(results), 2)
 
-    def _normalise(self, text: str) -> str:
-        value = str(text or "").lower()
-        value = value.replace("&", " and ")
-        value = re.sub(r"[^a-z0-9+\-.% ]+", " ", value)
-        value = re.sub(r"\s+", " ", value)
-        return f" {value.strip()} "
+    def _normalise(
+        self,
+        text: str,
+    ) -> str:
+        value = str(
+            text or ""
+        ).lower()
 
-    def _normalise_term(self, term: str) -> str:
-        value = str(term or "").lower().strip()
-        value = value.replace("&", " and ")
-        value = re.sub(r"[^a-z0-9+\-.% ]+", " ", value)
-        value = re.sub(r"\s+", " ", value)
+        value = value.replace(
+            "&",
+            " and ",
+        )
+
+        value = re.sub(
+            r"[-??]+",
+            " ",
+            value,
+        )
+
+        value = re.sub(
+            r"[^a-z0-9+.% ]+",
+            " ",
+            value,
+        )
+
+        value = re.sub(
+            r"\s+",
+            " ",
+            value,
+        )
+
+        return (
+            f" {value.strip()} "
+        )
+
+    def _normalise_term(
+        self,
+        term: str,
+    ) -> str:
+        value = str(
+            term or ""
+        ).lower().strip()
+
+        value = value.replace(
+            "&",
+            " and ",
+        )
+
+        value = re.sub(
+            r"[-??]+",
+            " ",
+            value,
+        )
+
+        value = re.sub(
+            r"[^a-z0-9+.% ]+",
+            " ",
+            value,
+        )
+
+        value = re.sub(
+            r"\s+",
+            " ",
+            value,
+        )
+
         return value.strip()
 
     def _contains_phrase(self, text: str, phrase: str) -> bool:

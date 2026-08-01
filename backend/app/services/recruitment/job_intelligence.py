@@ -283,14 +283,64 @@ class JobIntelligence:
 
         return "Target Role"
 
-    def _title_clean(self, value: str) -> str:
+    def _title_clean(
+        self,
+        value: str,
+    ) -> str:
         clean = str(value or "")
+
         clean = clean.replace("*", "")
-        clean = clean.replace("–", " - ").replace("—", " - ")
-        clean = clean.replace("-", "-")
-        clean = re.sub(r"\s+", " ", clean)
-        clean = re.sub(r"\s*-\s*", " – ", clean)
-        clean = clean.strip(" .,:;|-")
+
+        clean = (
+            clean
+            .replace("???", " - ")
+            .replace("???", " - ")
+        )
+
+        clean = re.sub(
+            r"^\s{0,3}#{1,6}\s*",
+            "",
+            clean,
+        )
+
+        clean = re.sub(
+            (
+                r"^\s*(?:sample\s+)?"
+                r"job\s+description\s*"
+                r"[:\-]\s*"
+            ),
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        )
+
+        clean = re.sub(
+            (
+                r"^\s*(?:job\s+title|"
+                r"position|role|post)\s*"
+                r"[:\-]\s*"
+            ),
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        )
+
+        clean = re.sub(
+            r"\s+",
+            " ",
+            clean,
+        )
+
+        clean = re.sub(
+            r"\s*-\s*",
+            " - ",
+            clean,
+        )
+
+        clean = clean.strip(
+            " .,:;|-#"
+        )
+
         return clean.strip()
 
     def _looks_like_title(self, line: str) -> bool:
@@ -447,11 +497,44 @@ class JobIntelligence:
 
         return any(word in lower for word in org_words)
 
-    def _clean_org(self, org: str) -> str:
+    def _clean_org(
+        self,
+        org: str,
+    ) -> str:
         clean = str(org or "").strip()
-        clean = re.sub(r"\s+", " ", clean)
-        clean = clean.strip(" .,-")
-        return clean.title() if clean.isupper() else clean
+
+        clean = re.sub(
+            r"^\s{0,3}#{1,6}\s*",
+            "",
+            clean,
+        )
+
+        clean = re.sub(
+            (
+                r"^\s*(?:company|"
+                r"organisation|organization|"
+                r"employer)\s*[:\-]\s*"
+            ),
+            "",
+            clean,
+            flags=re.IGNORECASE,
+        )
+
+        clean = re.sub(
+            r"\s+",
+            " ",
+            clean,
+        )
+
+        clean = clean.strip(
+            " .,-"
+        )
+
+        return (
+            clean.title()
+            if clean.isupper()
+            else clean
+        )
 
     def _extract_location(self, lines: List[str], text: str) -> str:
         for line in lines:
