@@ -18,6 +18,9 @@ from app.services.recruitment.job_intelligence import (
 from app.services.recruitment.keyword_extractor import (
     keyword_extractor,
 )
+from app.services.recruitment.semantic_matcher import (
+    semantic_matcher,
+)
 
 
 class ResumeReviewer:
@@ -91,37 +94,39 @@ class ResumeReviewer:
             )
         )
 
-        found_keywords = (
-            keyword_extractor
-            .find_in_resume(
-                resume_text,
-                active_keywords,
+        semantic_matches = (
+            semantic_matcher.match(
+                resume_text=resume_text,
+                requirements=active_keywords,
             )
         )
 
         found_keywords = (
             self._normalise_keywords(
-                found_keywords
+                semantic_matches.get(
+                    "matched",
+                    [],
+                )
             )
         )
 
-        found_norm = {
-            keyword_extractor.normalise(
-                keyword
-            )
-            for keyword in found_keywords
-        }
-
-        missing_keywords = [
-            keyword
-            for keyword in active_keywords
-            if (
-                keyword_extractor.normalise(
-                    keyword
+        partial_keywords = (
+            self._normalise_keywords(
+                semantic_matches.get(
+                    "partial",
+                    [],
                 )
-                not in found_norm
             )
-        ]
+        )
+
+        missing_keywords = (
+            self._normalise_keywords(
+                semantic_matches.get(
+                    "missing",
+                    [],
+                )
+            )
+        )
 
         parsed_candidate = (
             cv_parser.parse(
@@ -136,9 +141,9 @@ class ResumeReviewer:
                 )
             ),
             "skills_score": (
-                ats_scorer.skills_score(
-                    found_keywords,
-                    active_keywords,
+                semantic_matches.get(
+                    "score",
+                    0.0,
                 )
             ),
             "education_score": (
@@ -168,9 +173,9 @@ class ResumeReviewer:
                 )
             ),
             "job_match_score": (
-                ats_scorer.job_match_score(
-                    found_keywords,
-                    active_keywords,
+                semantic_matches.get(
+                    "score",
+                    0.0,
                 )
                 if job_context_available
                 else 0.0
@@ -354,6 +359,9 @@ class ResumeReviewer:
             ),
             "found_keywords": (
                 found_keywords
+            ),
+            "partial_keywords": (
+                partial_keywords
             ),
             "missing_keywords": (
                 missing_keywords

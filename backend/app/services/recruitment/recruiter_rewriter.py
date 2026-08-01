@@ -87,44 +87,49 @@ class RecruiterRewriter:
         review: Dict[str, Any],
         skills: List[str],
     ) -> str:
-        job_title = review.get("job_title") or "target role"
-        industry = review.get("industry") or "the target sector"
+        job_title = (
+            review.get("job_title")
+            or "the target role"
+        )
 
-        top_skills = self._select_best_skills(skills, review, limit=5)
+        industry = (
+            review.get("industry")
+            or "the target sector"
+        )
 
-        if "finance" in industry.lower() or "accounting" in industry.lower():
-            return (
-                f"Motivated finance and accounting candidate targeting {job_title}, "
-                f"with practical exposure to financial records, reconciliations, reporting, "
-                f"Microsoft Excel and accounting support. Brings strong attention to detail, "
-                f"confidentiality and a willingness to learn in structured finance environments."
-            )
-
-        if "ngo" in industry.lower() or "monitoring" in industry.lower() or "evaluation" in industry.lower():
-            return (
-                f"Motivated monitoring, evaluation and data-focused candidate targeting {job_title}, "
-                f"with practical exposure to data collection, documentation, reporting and programme support. "
-                f"Brings strong analytical ability, attention to detail and a commitment to using accurate information "
-                f"to support learning, accountability and evidence-based programme decisions."
-            )
-
-        if "data" in industry.lower() or "technology" in industry.lower():
-            return (
-                f"Analytically minded candidate targeting {job_title}, with practical exposure to data analysis, "
-                f"reporting, problem-solving and technology-enabled decision support. Skilled in {', '.join(top_skills[:4])}, "
-                f"with the ability to transform raw information into clear insights for operational and strategic use."
-            )
+        top_skills = self._select_best_skills(
+            skills,
+            review,
+            limit=5,
+        )
 
         if top_skills:
-            return (
-                f"Motivated candidate targeting {job_title}, with practical exposure to "
-                f"{', '.join(top_skills[:4])}. Brings strong attention to detail, clear communication, "
-                f"organisational ability and a willingness to contribute effectively within {industry}."
+            skill_text = ", ".join(
+                top_skills[:5]
             )
 
-        return resume_summary or (
-            f"Motivated candidate targeting {job_title}, with practical experience, strong attention to detail "
-            f"and the ability to support accurate work, reporting and team objectives."
+            return (
+                f"Candidate targeting {job_title} "
+                f"within {industry}, with visible "
+                f"CV evidence of {skill_text}. "
+                "Brings a documented foundation and "
+                "a focus on accurate, well-organised "
+                "professional work."
+            )
+
+        clean_summary = str(
+            resume_summary or ""
+        ).strip()
+
+        if clean_summary:
+            return clean_summary
+
+        return (
+            f"Candidate targeting {job_title} "
+            f"within {industry}, with relevant "
+            "education, project, training or "
+            "workplace evidence documented in "
+            "the submitted CV."
         )
 
     def _role_tailor(self, text: str, review: Dict[str, Any]) -> str:
@@ -153,39 +158,144 @@ class RecruiterRewriter:
 
         return text
 
-    def _ensure_action_verb(self, text: str, review: Dict[str, Any]) -> str:
-        clean = text.strip()
+    def _ensure_action_verb(
+        self,
+        text: str,
+        review: Dict[str, Any],
+    ) -> str:
+        del review
+
+        clean = str(text or "").strip()
+
+        if not clean:
+            return ""
+
         lower = clean.lower()
 
         action_verbs = (
-            "analysed", "analyzed", "prepared", "maintained", "captured", "verified",
-            "assisted", "coordinated", "monitored", "evaluated", "processed", "managed",
-            "reported", "documented", "communicated", "developed", "built", "improved",
-            "conducted", "created", "updated", "reviewed", "organised", "organized",
-            "used", "recorded", "participated", "applied", "produced", "recommended",
-            "addressed", "supported",
+            "achieved",
+            "addressed",
+            "analysed",
+            "analyzed",
+            "applied",
+            "assisted",
+            "automated",
+            "built",
+            "captured",
+            "collaborated",
+            "communicated",
+            "conducted",
+            "contributed",
+            "coordinated",
+            "created",
+            "delivered",
+            "designed",
+            "developed",
+            "documented",
+            "evaluated",
+            "generated",
+            "identified",
+            "implemented",
+            "improved",
+            "maintained",
+            "managed",
+            "monitored",
+            "organised",
+            "organized",
+            "participated",
+            "performed",
+            "prepared",
+            "presented",
+            "processed",
+            "produced",
+            "recommended",
+            "recorded",
+            "reported",
+            "resolved",
+            "reviewed",
+            "supported",
+            "trained",
+            "updated",
+            "used",
+            "validated",
+            "verified",
         )
 
         if lower.startswith(action_verbs):
             return clean
 
-        if lower.startswith("problem solved:"):
-            return "Addressed " + clean.split(":", 1)[1].strip()
+        labelled_prefixes = {
+            "problem solved:": "Addressed ",
+            "approach:": "Applied ",
+            "results:": "Produced ",
+            "recommendation:": "Recommended ",
+            "tools and methods:": "Applied ",
+        }
 
-        if lower.startswith("approach:"):
-            return "Applied " + clean.split(":", 1)[1].strip()
+        for label, prefix in labelled_prefixes.items():
+            if lower.startswith(label):
+                remainder = clean.split(
+                    ":",
+                    1,
+                )[1].strip()
 
-        if lower.startswith("results:"):
-            return "Produced " + clean.split(":", 1)[1].strip()
+                return (
+                    prefix + remainder
+                    if remainder
+                    else ""
+                )
 
-        if lower.startswith("recommendation:"):
-            return "Recommended " + clean.split(":", 1)[1].strip()
+        evidence_patterns = [
+            (
+                r"^(?:data cleaning|"
+                r"data validation|"
+                r"data analysis)\b",
+                "Performed ",
+            ),
+            (
+                r"^(?:dashboard|dashboards|"
+                r"dashboard inputs?)\b",
+                "Prepared ",
+            ),
+            (
+                r"^(?:report|reports|reporting)\b",
+                "Prepared ",
+            ),
+            (
+                r"^(?:field verification|"
+                r"verification activities)\b",
+                "Participated in ",
+            ),
+            (
+                r"^(?:user training|"
+                r"training sessions?)\b",
+                "Conducted ",
+            ),
+            (
+                r"^(?:software development|"
+                r"application development|"
+                r"system development)\b",
+                "Contributed to ",
+            ),
+        ]
 
-        if lower.startswith("tools and methods:"):
-            return "Applied " + clean.split(":", 1)[1].strip()
+        first_lower = (
+            clean[0].lower() + clean[1:]
+        )
 
-        first = clean[0].lower() + clean[1:] if clean else clean
-        return "Supported " + first
+        for pattern, prefix in evidence_patterns:
+            if re.match(
+                pattern,
+                lower,
+                flags=re.IGNORECASE,
+            ):
+                return prefix + first_lower
+
+        # Preserve source evidence rather than inventing
+        # a generic responsibility.
+        return (
+            clean[0].upper() + clean[1:]
+        )
 
     def _fix_project_labels(self, text: str) -> str:
         replacements = {
