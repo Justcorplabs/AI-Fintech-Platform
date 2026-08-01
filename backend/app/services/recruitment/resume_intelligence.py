@@ -293,44 +293,222 @@ class ResumeIntelligence:
         lines = sections.get("experience", [])
         return experience_parser.parse(lines)
 
-    def _extract_education(self, sections: Dict[str, List[str]]) -> List[Dict[str, str]]:
-        lines = sections.get("education", [])
-        education = []
+    def _extract_education(
+        self,
+        sections: Dict[str, List[str]],
+    ) -> List[Dict[str, str]]:
+        lines = (
+            sections.get(
+                "education",
+                [],
+            )
+            or []
+        )
 
-        if not lines:
-            return education
+        education: List[
+            Dict[str, str]
+        ] = []
 
         current = None
+        pending_institution = ""
+
+        qualification_terms = (
+            "degree",
+            "honours",
+            "bachelor",
+            "bsc",
+            "msc",
+            "master",
+            "diploma",
+            "certificate",
+            "advanced level",
+            "a level",
+            "ordinary level",
+            "o level",
+        )
+
+        institution_terms = (
+            "university",
+            "college",
+            "school",
+            "institute",
+            "academy",
+            "polytechnic",
+        )
+
+        def is_academic_metadata(
+            value: str,
+        ) -> bool:
+            lower = value.lower()
+
+            metadata_terms = (
+                "degree class",
+                "class:",
+                "upper second",
+                "lower second",
+                "first class",
+                "second class",
+                "distinction",
+                "merit",
+                "grade:",
+                "gpa",
+                "classification",
+            )
+
+            return any(
+                term in lower
+                for term in metadata_terms
+            )
+
+        def is_qualification(
+            value: str,
+        ) -> bool:
+            lower = value.lower()
+
+            if is_academic_metadata(
+                value
+            ):
+                return False
+
+            return any(
+                term in lower
+                for term in qualification_terms
+            )
+
+        def is_institution(
+            value: str,
+        ) -> bool:
+            lower = value.lower()
+
+            return any(
+                term in lower
+                for term in institution_terms
+            )
+
+        def append_current() -> None:
+            nonlocal current
+
+            if (
+                current
+                and current.get(
+                    "qualification"
+                )
+            ):
+                education.append(
+                    current
+                )
+
+            current = None
 
         for line in lines:
-            clean = self._clean_item(line)
-            lower = clean.lower()
+            clean = self._clean_item(
+                line
+            )
 
             if not clean:
                 continue
 
-            if any(word in lower for word in ["degree", "bachelor", "bsc", "msc", "master", "diploma", "certificate", "a level", "o level"]):
-                if current:
-                    education.append(current)
+            lower = clean.lower()
+            period = self._extract_period(
+                clean
+            )
 
-                current = {
-                    "qualification": clean,
-                    "institution": "",
-                    "period": self._extract_period(clean),
-                }
+            qualification = (
+                is_qualification(
+                    clean
+                )
+            )
+
+            institution = (
+                is_institution(
+                    clean
+                )
+            )
+
+            # Supports institution-first layouts:
+            # University of Zimbabwe
+            # BSc Honours Degree...
+            if institution and not qualification:
+                if (
+                    current
+                    and not current.get(
+                        "institution"
+                    )
+                ):
+                    current[
+                        "institution"
+                    ] = clean
+
+                else:
+                    append_current()
+                    pending_institution = (
+                        clean
+                    )
+
                 continue
 
-            if current is None:
+            if qualification:
+                append_current()
+
                 current = {
                     "qualification": clean,
-                    "institution": "",
-                    "period": self._extract_period(clean),
+                    "institution": (
+                        pending_institution
+                    ),
+                    "period": period,
                 }
-            elif not current.get("institution"):
-                current["institution"] = clean
 
-        if current:
-            education.append(current)
+                pending_institution = ""
+                continue
+
+            if current:
+                if (
+                    period
+                    and not current.get(
+                        "period"
+                    )
+                ):
+                    current[
+                        "period"
+                    ] = period
+
+                if any(
+                    term in lower
+                    for term in (
+                        "degree class",
+                        "upper second",
+                        "first class",
+                        "second class",
+                        "distinction",
+                        "merit",
+                    )
+                ):
+                    if (
+                        clean.lower()
+                        not in current[
+                            "qualification"
+                        ].lower()
+                    ):
+                        current[
+                            "qualification"
+                        ] += (
+                            f" | {clean}"
+                        )
+
+                elif (
+                    not current.get(
+                        "institution"
+                    )
+                    and len(
+                        clean.split()
+                    )
+                    <= 10
+                ):
+                    current[
+                        "institution"
+                    ] = clean
+
+        append_current()
 
         return education[:8]
 
@@ -393,17 +571,150 @@ class ResumeIntelligence:
 
         return languages or ["English"]
 
-    def _extract_references(self, sections: Dict[str, List[str]]) -> List[str]:
-        lines = sections.get("references", [])
-        refs = []
+    def _extract_references(
+        self,
+        sections: Dict[str, List[str]],
+    ) -> List[str]:
+        lines = (
+            sections.get(
+                "references",
+                [],
+            )
+            or []
+        )
+
+        references: List[str] = []
+        started = False
+
+        languages = {
+            "english",
+            "shona",
+            "ndebele",
+            "french",
+            "portuguese",
+        }
+
+        def is_language_line(
+            value: str,
+        ) -> bool:
+            lower = value.lower()
+
+            if lower.startswith(
+                (
+                    "language:",
+                    "languages:",
+                )
+            ):
+                return True
+
+            detected = [
+                language
+                for language in languages
+                if re.search(
+                    rf"\b{language}\b",
+                    lower,
+                )
+            ]
+
+            return bool(
+                detected
+                and (
+                    ":" in value
+                    or "fluent" in lower
+                    or "native" in lower
+                    or "proficient" in lower
+                )
+            )
+
+        def looks_like_name(
+            value: str,
+        ) -> bool:
+            if (
+                ":" in value
+                or "@" in value
+                or any(
+                    char.isdigit()
+                    for char in value
+                )
+            ):
+                return False
+
+            words = value.split()
+
+            if (
+                len(words) < 2
+                or len(words) > 4
+            ):
+                return False
+
+            title = (
+                words[0]
+                .lower()
+                .replace(".", "")
+            )
+
+            if title in {
+                "mr",
+                "mrs",
+                "ms",
+                "miss",
+                "dr",
+                "prof",
+            }:
+                return True
+
+            return all(
+                word[0].isupper()
+                or word.lower()
+                in {
+                    "de",
+                    "van",
+                    "and",
+                }
+                for word in words
+                if word
+            )
 
         for line in lines:
-            clean = self._clean_item(line)
+            clean = self._clean_item(
+                line
+            )
 
-            if len(clean) > 2:
-                refs.append(clean)
+            if not clean:
+                continue
 
-        return refs[:8]
+            lower = clean.lower()
+
+            if (
+                "available upon request"
+                in lower
+            ):
+                return [
+                    "Available upon request."
+                ]
+
+            if is_language_line(
+                clean
+            ):
+                continue
+
+            # Ignore duplicated titles or language
+            # content occurring before the first
+            # identifiable referee name.
+            if not started:
+                if not looks_like_name(
+                    clean
+                ):
+                    continue
+
+                started = True
+
+            if clean not in references:
+                references.append(
+                    clean
+                )
+
+        return references[:12]
 
     def _clean_item(self, value: str) -> str:
         value = str(value or "").strip()

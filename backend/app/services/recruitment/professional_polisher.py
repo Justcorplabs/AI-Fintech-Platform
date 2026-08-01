@@ -27,6 +27,19 @@ class ProfessionalPolisher:
         "excel": "Microsoft Excel",
     }
 
+    SKILL_PREFIXES = {
+        "programming and data ": "",
+        "machine learning ": "Machine Learning",
+        "model evaluation ": "Model Evaluation",
+        "explainable artificial intelligence ": "Explainable AI",
+    }
+
+    DROP_SKILLS = {
+        "data",
+        "pr",
+        "auc",
+    }
+
     WEAK_SKILLS = {
         "reporting",
         "monitoring",
@@ -85,31 +98,67 @@ class ProfessionalPolisher:
 
         return polished
 
-    def polish_skills(self, skills: List[str], technical: bool = False) -> List[str]:
-        output = []
+    def polish_skills(
+        self,
+        skills: List[str],
+        technical: bool = False,
+    ) -> List[str]:
+        output: List[str] = []
         seen = set()
 
-        for skill in skills or []:
-            clean = self._clean(skill)
-            canonical = self._canonical_skill(clean)
-            key = canonical.lower()
+        for raw_skill in skills or []:
+            candidates = (
+                self._expand_skill(
+                    raw_skill
+                )
+            )
 
-            if not canonical:
-                continue
+            for skill in candidates:
+                clean = self._clean(
+                    skill
+                )
 
-            if key in seen:
-                continue
+                canonical = (
+                    self._canonical_skill(
+                        clean
+                    )
+                )
 
-            if key in self.WEAK_SKILLS and self._has_stronger_skill(key, seen):
-                continue
+                key = canonical.lower()
 
-            if key == "monitoring":
-                continue
+                if not canonical:
+                    continue
 
-            seen.add(key)
-            output.append(canonical)
+                if key in self.DROP_SKILLS:
+                    continue
 
-        return output[:16 if technical else 18]
+                if key in seen:
+                    continue
+
+                if (
+                    key in self.WEAK_SKILLS
+                    and self._has_stronger_skill(
+                        key,
+                        seen,
+                    )
+                ):
+                    continue
+
+                if key == "monitoring":
+                    continue
+
+                seen.add(key)
+                output.append(
+                    canonical
+                )
+
+        limit = (
+            16
+            if technical
+            else 18
+        )
+
+        return output[:limit]
 
     def polish_achievements(
         self,
@@ -210,27 +259,79 @@ class ProfessionalPolisher:
 
         return []
 
-    def _remove_bad_reference_lines(self, lines: List[str]) -> List[str]:
+    def _remove_bad_reference_lines(
+        self,
+        lines: List[str],
+    ) -> List[str]:
         output = []
 
+        languages = {
+            "english",
+            "shona",
+            "ndebele",
+            "french",
+            "portuguese",
+        }
+
         for line in lines:
-            clean = self._clean(line)
+            clean = self._clean(
+                line
+            )
+
             lower = clean.lower()
 
             if not clean:
                 continue
 
-            if lower in ["reference", "references", "professional references"]:
+            if lower in {
+                "reference",
+                "references",
+                "professional references",
+            }:
                 continue
 
-            if lower in ["english", "shona", "ndebele"]:
+            if lower.startswith(
+                (
+                    "language:",
+                    "languages:",
+                )
+            ):
                 continue
 
-            if "interest" in lower or "football" in lower or "cricket" in lower:
+            if any(
+                re.search(
+                    rf"\b{language}\b",
+                    lower,
+                )
+                for language in languages
+            ) and any(
+                marker in lower
+                for marker in (
+                    ":",
+                    "native",
+                    "fluent",
+                    "proficient",
+                )
+            ):
+                continue
+
+            if lower in languages:
+                continue
+
+            if any(
+                term in lower
+                for term in (
+                    "interest",
+                    "football",
+                    "cricket",
+                )
+            ):
                 continue
 
             if clean not in output:
-                output.append(clean)
+                output.append(
+                    clean
+                )
 
         return output
 
@@ -369,9 +470,129 @@ class ProfessionalPolisher:
 
         return ""
 
-    def _canonical_skill(self, skill: str) -> str:
-        key = skill.lower()
-        return self.CANONICAL_SKILLS.get(key, skill)
+    def _expand_skill(
+        self,
+        skill: str,
+    ) -> List[str]:
+        clean = self._clean(
+            skill
+        )
+
+        lower = clean.lower()
+
+        for (
+            prefix,
+            category,
+        ) in self.SKILL_PREFIXES.items():
+            if (
+                lower.startswith(
+                    prefix
+                )
+                and len(clean)
+                > len(prefix)
+            ):
+                remainder = clean[
+                    len(prefix):
+                ].strip()
+
+                output = []
+
+                if category:
+                    output.append(
+                        category
+                    )
+
+                if remainder:
+                    output.append(
+                        remainder
+                    )
+
+                return output
+
+        return [clean] if clean else []
+
+    def _canonical_skill(
+        self,
+        skill: str,
+    ) -> str:
+        key = skill.lower().strip()
+
+        canonical = {
+            "python": "Python",
+            "sql": "SQL",
+            "powerbi": "Power BI",
+            "power bi": "Power BI",
+            "tableau": "Tableau",
+            "data cleaning": "Data Cleaning",
+            "data validation": "Data Validation",
+            "data transformation": (
+                "Data Transformation"
+            ),
+            "transformation": (
+                "Data Transformation"
+            ),
+            "statistical analysis": (
+                "Statistical Analysis"
+            ),
+            "machine learning": (
+                "Machine Learning"
+            ),
+            "logistic regression": (
+                "Logistic Regression"
+            ),
+            "decision tree": (
+                "Decision Trees"
+            ),
+            "decision trees": (
+                "Decision Trees"
+            ),
+            "random forest": (
+                "Random Forest"
+            ),
+            "model evaluation": (
+                "Model Evaluation"
+            ),
+            "precision": (
+                "Precision, Recall & F1-Score"
+            ),
+            "recall": (
+                "Precision, Recall & F1-Score"
+            ),
+            "f1-score": (
+                "Precision, Recall & F1-Score"
+            ),
+            "f1 score": (
+                "Precision, Recall & F1-Score"
+            ),
+            "roc-auc": (
+                "ROC-AUC & PR-AUC"
+            ),
+            "roc auc": (
+                "ROC-AUC & PR-AUC"
+            ),
+            "pr-auc": (
+                "ROC-AUC & PR-AUC"
+            ),
+            "pr auc": (
+                "ROC-AUC & PR-AUC"
+            ),
+            "explainable ai": (
+                "Explainable AI"
+            ),
+            "explainable artificial intelligence": (
+                "Explainable AI"
+            ),
+            "shap": "SHAP",
+            "lime": "LIME",
+        }
+
+        return canonical.get(
+            key,
+            self.CANONICAL_SKILLS.get(
+                key,
+                skill,
+            ),
+        )
 
     def _has_stronger_skill(self, weak_skill: str, seen: set) -> bool:
         stronger_map = {

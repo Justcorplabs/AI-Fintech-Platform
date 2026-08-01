@@ -190,11 +190,14 @@ class JobIntelligence:
             "software_tools": software_tools,
             "soft_skills": soft_skills,
             "degree_requirements": degree_requirements,
+            "degree_requirement_group": {
+                "mode": "any",
+                "options": degree_requirements,
+            },
             "keywords": self._combined_keywords(
                 technical_requirements,
                 software_tools,
                 soft_skills,
-                degree_requirements,
             ),
             "raw_text": raw,
         }
@@ -750,19 +753,92 @@ class JobIntelligence:
 
         return self._clean_terms(found)
 
-    def _extract_experience_requirement(self, text: str) -> str:
-        match = re.search(
-            r"(minimum of\s+)?(\d+)\s*(?:\+)?\s+years?['’]?\s+experience",
+    def _extract_experience_requirement(
+        self,
+        text: str,
+    ) -> str:
+        labelled = re.search(
+            (
+                r"(?:experience\s+level|"
+                r"seniority\s+level)\s*"
+                r"[:\-]\s*([^\n]+)"
+            ),
             text,
-            re.IGNORECASE,
+            flags=re.IGNORECASE,
         )
 
-        if match:
-            years = match.group(2)
-            return f"{years}+ years"
+        if labelled:
+            value = re.sub(
+                r"\s+",
+                " ",
+                labelled.group(1),
+            ).strip(" .,-")
 
-        if re.search(r"\bgraduate\b|\bintern\b|\btrainee\b", text, re.IGNORECASE):
-            return "Graduate / Entry Level"
+            lower = value.lower()
+
+            if any(
+                term in lower
+                for term in (
+                    "entry",
+                    "junior",
+                    "graduate",
+                    "intern",
+                    "trainee",
+                )
+            ):
+                return "Entry Level"
+
+            if "mid" in lower:
+                return "Mid Level"
+
+            if any(
+                term in lower
+                for term in (
+                    "senior",
+                    "lead",
+                    "management",
+                )
+            ):
+                return "Senior Level"
+
+            return value
+
+        patterns = [
+            (
+                r"(?:minimum|at least)?\s*"
+                r"(\d+)\+?\s*years?"
+                r"(?:\s+of)?\s+"
+                r"(?:relevant\s+)?experience"
+            ),
+            (
+                r"(\d+)\+?\s*years?"
+                r"['?]?\s+experience"
+            ),
+        ]
+
+        for pattern in patterns:
+            match = re.search(
+                pattern,
+                text,
+                flags=re.IGNORECASE,
+            )
+
+            if match:
+                return (
+                    f"{match.group(1)}+ years"
+                )
+
+        if re.search(
+            (
+                r"\bgraduate\b|"
+                r"\bintern\b|"
+                r"\btrainee\b|"
+                r"\bentry[- ]level\b"
+            ),
+            text,
+            flags=re.IGNORECASE,
+        ):
+            return "Entry Level"
 
         return "Not specified"
 
@@ -818,14 +894,72 @@ class JobIntelligence:
 
         return output
 
-    def _clean_term(self, item: str) -> str:
-        value = str(item or "").lower().strip()
-        value = value.replace("\\", "")
-        value = value.replace("?", "")
-        value = value.replace("*", "")
-        value = re.sub(r"[^a-z0-9&/\- ]+", " ", value)
-        value = re.sub(r"\s+", " ", value)
-        return value.strip()
+    def _clean_term(
+        self,
+        item: str,
+    ) -> str:
+        value = str(
+            item or ""
+        ).lower().strip()
+
+        value = value.replace(
+            "\\",
+            "",
+        )
+
+        value = value.replace(
+            "?",
+            "",
+        )
+
+        value = value.replace(
+            "*",
+            "",
+        )
+
+        value = re.sub(
+            r"[^a-z0-9&/\- ]+",
+            " ",
+            value,
+        )
+
+        value = re.sub(
+            r"[-??]+",
+            " ",
+            value,
+        )
+
+        value = re.sub(
+            r"\s+",
+            " ",
+            value,
+        ).strip()
+
+        aliases = {
+            "dashboard": "dashboards",
+            "dashboards": "dashboards",
+            "database": "databases",
+            "databases": "databases",
+            "excel": "microsoft excel",
+            "microsoft excel": (
+                "microsoft excel"
+            ),
+            "powerbi": "power bi",
+            "power bi": "power bi",
+            "problem solving": (
+                "problem solving"
+            ),
+            "problem-solving": (
+                "problem solving"
+            ),
+            "teamwork": "team",
+            "collaborative": "team",
+        }
+
+        return aliases.get(
+            value,
+            value,
+        )
 
     def _dedupe(self, items: List[str]) -> List[str]:
         output = []
