@@ -1,30 +1,56 @@
 import {
   BrowserRouter,
   Navigate,
+  Outlet,
   Route,
   Routes,
 } from "react-router";
 import { Toaster } from "react-hot-toast";
 
+import {
+  AuthProvider,
+} from "./auth/AuthContext";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import Sidebar from "./components/layout/Sidebar";
+import TopBar from "./components/layout/TopBar";
+import Login from "./pages/Login";
 import Recruitment from "./pages/Recruitment";
 import ResumeReviewer from "./pages/ResumeReviewer";
 
-import Sidebar from "./components/layout/Sidebar";
-import TopBar from "./components/layout/TopBar";
+function ProtectedLayout() {
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-50">
+      <Sidebar />
+
+      <main className="ml-72 min-h-screen">
+        <TopBar />
+
+        <section className="p-8">
+          <Outlet />
+        </section>
+      </main>
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-950 text-slate-50">
-        <Sidebar />
+      <AuthProvider>
+        <Routes>
+          <Route
+            path="/login"
+            element={<Login />}
+          />
 
-        <main className="ml-72 min-h-screen">
-          <TopBar />
-
-          <section className="p-8">
-            <Routes>
+          <Route
+            element={<ProtectedRoute />}
+          >
+            <Route
+              element={<ProtectedLayout />}
+            >
               <Route
-                path="/"
+                index
                 element={
                   <Navigate
                     to="/resume-reviewer"
@@ -42,19 +68,19 @@ export default function App() {
                 path="/recruitment"
                 element={<Recruitment />}
               />
+            </Route>
+          </Route>
 
-              <Route
-                path="*"
-                element={
-                  <Navigate
-                    to="/resume-reviewer"
-                    replace
-                  />
-                }
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
               />
-            </Routes>
-          </section>
-        </main>
+            }
+          />
+        </Routes>
 
         <Toaster
           position="top-right"
@@ -66,7 +92,7 @@ export default function App() {
             },
           }}
         />
-      </div>
+      </AuthProvider>
     </BrowserRouter>
   );
 }

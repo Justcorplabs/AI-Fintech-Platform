@@ -510,10 +510,24 @@ def test_resume_topbar_is_recruitment_specific():
         in topbar
     )
 
-    assert "Recruiter" in topbar
-    assert "Fraud Analyst" not in topbar
-    assert "ROC-AUC" not in topbar
+    assert (
+        "AI-assisted recruitment"
+        in topbar
+    )
 
+    assert "useAuth" in topbar
+    assert "user?.full_name" in topbar
+    assert "user?.role" in topbar
+    assert "formatRole" in topbar
+    assert "onClick={logout}" in topbar
+
+    assert (
+        "Recruitment Team"
+        not in topbar
+    )
+
+    assert "fraudAPI" not in topbar
+    assert "Fraud Analyst" not in topbar
 
 def test_compose_defines_separate_frontend_services():
     compose = read_text(
