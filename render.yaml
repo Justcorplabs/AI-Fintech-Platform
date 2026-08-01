@@ -43,7 +43,8 @@ services:
       - key: ALLOWED_ORIGINS
         value: >-
           ["https://justcorplabs-fraud-intelligence.onrender.com",
-          "https://justcorplabs-resume-intelligence.onrender.com"]
+          "https://justcorplabs-resume-intelligence.onrender.com",
+          "https://justcorplabs-resume-intelligence.vercel.app"]
 
       - key: FRONTEND_URL
         value: >-
