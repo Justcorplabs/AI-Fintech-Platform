@@ -1,3 +1,4 @@
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -59,6 +60,12 @@ from app.services.auth_audit import (
     create_user_auth_audit_log,
 )
 
+from app.services.email.password_reset import (
+    PasswordResetEmailError,
+    send_password_reset_email,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/auth",
@@ -1146,15 +1153,36 @@ def forgot_password(
             ),
         )
 
-    if settings.is_production:
-        return ForgotPasswordResponse(
-            message=generic_message
-        )
-
     reset_url = (
         f"{settings.FRONTEND_URL}/reset-password"
         f"?token={raw_reset_token}"
     )
+
+    if settings.PASSWORD_RESET_EMAIL_ENABLED:
+        try:
+            send_password_reset_email(
+                recipient_email=user.email,
+                recipient_name=user.full_name,
+                reset_url=reset_url,
+                expires_minutes=(
+                    settings
+                    .PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
+                ),
+            )
+
+        except PasswordResetEmailError:
+            # The public response remains neutral and
+            # does not reveal whether the account exists.
+            logger.exception(
+                "Password-reset email delivery "
+                "failed for user_id=%s.",
+                user.id,
+            )
+
+    if settings.is_production:
+        return ForgotPasswordResponse(
+            message=generic_message
+        )
 
     return ForgotPasswordResponse(
         message=generic_message,
