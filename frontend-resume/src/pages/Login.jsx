@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import {
+  Link,
   useLocation,
   useNavigate,
 } from "react-router";
@@ -49,7 +50,9 @@ export default function Login() {
   } = useAuth();
 
   const [form, setForm] = useState({
-    email: "",
+    email:
+      location.state?.registeredEmail ||
+      "",
     password: "",
   });
 
@@ -145,6 +148,20 @@ export default function Login() {
           resume review and recruitment tools.
         </p>
 
+        {location.state?.registrationComplete && (
+          <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            Your account was created successfully.
+            Sign in using your new password.
+          </div>
+        )}
+
+        {location.state?.passwordResetComplete && (
+          <div className="mt-5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            Your password was reset successfully.
+            Sign in using your new password.
+          </div>
+        )}
+
         <form
           onSubmit={handleSubmit}
           className="mt-8 space-y-5"
@@ -171,12 +188,21 @@ export default function Login() {
           </div>
 
           <div>
-            <label
-              htmlFor="password"
-              className="mb-2 block text-sm font-medium text-slate-300"
-            >
-              Password
-            </label>
+            <div className="mb-2 flex items-center justify-between">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-slate-300"
+              >
+                Password
+              </label>
+
+              <Link
+                to="/forgot-password"
+                className="text-sm font-semibold text-violet-300 hover:text-violet-200"
+              >
+                Forgot password?
+              </Link>
+            </div>
 
             <input
               id="password"
@@ -212,6 +238,16 @@ export default function Login() {
             )}
           </button>
         </form>
+
+        <p className="mt-7 text-center text-sm text-slate-400">
+          Do not have an account?{" "}
+          <Link
+            to="/register"
+            className="font-semibold text-violet-300 hover:text-violet-200"
+          >
+            Create account
+          </Link>
+        </p>
       </div>
     </div>
   );

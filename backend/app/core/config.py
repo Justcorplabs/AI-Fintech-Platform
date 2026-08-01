@@ -37,7 +37,18 @@ class Settings(BaseSettings):
     FAILED_LOGIN_MAX_ATTEMPTS: int = 5
     ACCOUNT_LOCKOUT_MINUTES: int = 15
 
-    FRONTEND_URL: str = "http://localhost:5173"
+    FRONTEND_URL: str = "http://localhost:5174"
+
+    PASSWORD_RESET_EMAIL_ENABLED: bool = False
+
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_FROM_NAME: str = "JustCorp Talent AI"
+    SMTP_USE_TLS: bool = True
+    SMTP_TIMEOUT_SECONDS: int = 15
 
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama3-70b-8192"
@@ -184,6 +195,38 @@ class Settings(BaseSettings):
             )
 
         return cleaned
+
+    @field_validator(
+        "SMTP_PORT"
+    )
+    @classmethod
+    def validate_smtp_port(
+        cls,
+        value: int,
+    ) -> int:
+        if value < 1 or value > 65535:
+            raise ValueError(
+                "SMTP_PORT must be between "
+                "1 and 65535."
+            )
+
+        return value
+
+    @field_validator(
+        "SMTP_TIMEOUT_SECONDS"
+    )
+    @classmethod
+    def validate_smtp_timeout(
+        cls,
+        value: int,
+    ) -> int:
+        if value < 1 or value > 120:
+            raise ValueError(
+                "SMTP_TIMEOUT_SECONDS must be "
+                "between 1 and 120."
+            )
+
+        return value
 
     @field_validator(
         "ACCESS_TOKEN_EXPIRE_MINUTES"
@@ -355,6 +398,57 @@ class Settings(BaseSettings):
             )
 
         return value
+
+    @model_validator(
+        mode="after"
+    )
+    def validate_password_reset_email_settings(
+        self,
+    ):
+        if not self.PASSWORD_RESET_EMAIL_ENABLED:
+            return self
+
+        missing = []
+
+        if not self.SMTP_HOST.strip():
+            missing.append("SMTP_HOST")
+
+        if not self.SMTP_FROM_EMAIL.strip():
+            missing.append("SMTP_FROM_EMAIL")
+
+        if missing:
+            raise ValueError(
+                "Password-reset email delivery "
+                "requires: "
+                + ", ".join(missing)
+                + "."
+            )
+
+        username_configured = bool(
+            self.SMTP_USERNAME.strip()
+        )
+
+        password_configured = bool(
+            self.SMTP_PASSWORD
+        )
+
+        if (
+            username_configured
+            != password_configured
+        ):
+            raise ValueError(
+                "SMTP_USERNAME and SMTP_PASSWORD "
+                "must either both be configured "
+                "or both be empty."
+            )
+
+        if "@" not in self.SMTP_FROM_EMAIL:
+            raise ValueError(
+                "SMTP_FROM_EMAIL must be a "
+                "valid email address."
+            )
+
+        return self
 
     @model_validator(
         mode="after"

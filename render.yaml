@@ -48,7 +48,34 @@ services:
 
       - key: FRONTEND_URL
         value: >-
-          https://justcorplabs-fraud-intelligence.onrender.com
+          https://justcorplabs-resume-intelligence.vercel.app
+
+      - key: PASSWORD_RESET_EMAIL_ENABLED
+        value: "false"
+
+      - key: SMTP_HOST
+        sync: false
+
+      - key: SMTP_PORT
+        value: "587"
+
+      - key: SMTP_USERNAME
+        sync: false
+
+      - key: SMTP_PASSWORD
+        sync: false
+
+      - key: SMTP_FROM_EMAIL
+        sync: false
+
+      - key: SMTP_FROM_NAME
+        value: "JustCorp Talent AI"
+
+      - key: SMTP_USE_TLS
+        value: "true"
+
+      - key: SMTP_TIMEOUT_SECONDS
+        value: "15"
 
       - key: ALLOW_FRAUD_DEMO_MODE
         value: "false"
