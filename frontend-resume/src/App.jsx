@@ -13,8 +13,11 @@ import {
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Sidebar from "./components/layout/Sidebar";
 import TopBar from "./components/layout/TopBar";
+import ForgotPassword from "./pages/ForgotPassword";
 import Login from "./pages/Login";
 import Recruitment from "./pages/Recruitment";
+import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import ResumeReviewer from "./pages/ResumeReviewer";
 
 function ProtectedLayout() {
@@ -41,6 +44,21 @@ export default function App() {
           <Route
             path="/login"
             element={<Login />}
+          />
+
+          <Route
+            path="/register"
+            element={<Register />}
+          />
+
+          <Route
+            path="/forgot-password"
+            element={<ForgotPassword />}
+          />
+
+          <Route
+            path="/reset-password"
+            element={<ResetPassword />}
           />
 
           <Route

@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 
 PROJECT_ROOT = (
@@ -95,3 +95,154 @@ def test_topbar_uses_authenticated_user_and_logout():
     assert "user?.role" in source
     assert "onClick={logout}" in source
     assert "Recruitment Team" not in source
+
+
+def test_resume_frontend_has_public_registration_route():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "App.jsx"
+    )
+
+    assert 'path="/register"' in source
+    assert "element={<Register />}" in source
+    assert (
+        'import Register from '
+        '"./pages/Register";'
+        in source
+    )
+
+
+def test_resume_registration_uses_safe_public_contract():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Register.jsx"
+    )
+
+    assert "authAPI.register" in source
+    assert "full_name" in source
+    assert "email" in source
+    assert "organisation" in source
+    assert "password" in source
+    assert "confirmPassword" in source
+
+    assert "role:" not in source
+    assert 'name="role"' not in source
+    assert "selectRole" not in source
+
+
+def test_resume_login_links_to_registration():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Login.jsx"
+    )
+
+    assert 'to="/register"' in source
+    assert "Create account" in source
+    assert "registeredEmail" in source
+    assert "registrationComplete" in source
+
+
+def test_resume_frontend_has_password_reset_routes():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "App.jsx"
+    )
+
+    assert (
+        'path="/forgot-password"'
+        in source
+    )
+
+    assert (
+        "element={<ForgotPassword />}"
+        in source
+    )
+
+    assert (
+        'path="/reset-password"'
+        in source
+    )
+
+    assert (
+        "element={<ResetPassword />}"
+        in source
+    )
+
+
+def test_resume_auth_api_supports_password_reset():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "services"
+        / "authApi.js"
+    )
+
+    assert "forgotPassword" in source
+    assert '"/auth/forgot-password"' in source
+    assert "resetPassword" in source
+    assert '"/auth/reset-password"' in source
+
+
+def test_resume_login_links_to_forgot_password():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "Login.jsx"
+    )
+
+    assert 'to="/forgot-password"' in source
+    assert "Forgot password?" in source
+    assert "passwordResetComplete" in source
+
+
+def test_forgot_password_uses_neutral_response():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "ForgotPassword.jsx"
+    )
+
+    assert "authAPI.forgotPassword" in source
+    assert "neutralMessage" in source
+    assert "active account exists" in source
+    assert "developmentResetUrl" in source
+    assert "response.data?.reset_url" in source
+
+
+def test_reset_password_uses_backend_contract():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "pages"
+        / "ResetPassword.jsx"
+    )
+
+    assert "useSearchParams" in source
+    assert 'searchParams.get("token")' in source
+    assert "authAPI.resetPassword" in source
+    assert "new_password" in source
+    assert "confirm_password" in source
+    assert "getPasswordError" in source
+
+
+def test_shared_password_validation_matches_backend():
+    source = read_text(
+        RESUME_FRONTEND
+        / "src"
+        / "utils"
+        / "passwordValidation.js"
+    )
+
+    assert "password.length < 8" in source
+    assert "/[A-Z]/" in source
+    assert "/[a-z]/" in source
+    assert "/[0-9]/" in source
+    assert "password.trim()" in source

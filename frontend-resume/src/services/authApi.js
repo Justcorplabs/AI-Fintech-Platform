@@ -23,6 +23,18 @@ export const authAPI = {
       data
     ),
 
+  forgotPassword: (data) =>
+    httpClient.post(
+      "/auth/forgot-password",
+      data
+    ),
+
+  resetPassword: (data) =>
+    httpClient.post(
+      "/auth/reset-password",
+      data
+    ),
+
   getCurrentUser: () =>
     httpClient.get("/auth/me"),
 };
