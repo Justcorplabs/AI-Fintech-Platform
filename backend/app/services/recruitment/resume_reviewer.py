@@ -48,6 +48,54 @@ class ResumeReviewer:
             )
         )
 
+        degree_requirements = (
+            job_profile.get(
+                "degree_requirements",
+                [],
+            )
+            or []
+        )
+
+        degree_matches = (
+            semantic_matcher.match(
+                resume_text=resume_text,
+                requirements=(
+                    degree_requirements
+                ),
+            )
+            if degree_requirements
+            else {
+                "matched": [],
+                "partial": [],
+                "missing": [],
+                "score": 0.0,
+            }
+        )
+
+        degree_evidence = [
+            *(
+                degree_matches.get(
+                    "matched",
+                    [],
+                )
+                or []
+            ),
+            *(
+                degree_matches.get(
+                    "partial",
+                    [],
+                )
+                or []
+            ),
+        ]
+
+        degree_requirement_satisfied = (
+            not degree_requirements
+            or bool(
+                degree_evidence
+            )
+        )
+
         job_keywords = (
             job_profile.get(
                 "keywords",
@@ -344,6 +392,21 @@ class ResumeReviewer:
                     "degree_requirements",
                     [],
                 )
+            ),
+            "degree_requirement_group": (
+                job_profile.get(
+                    "degree_requirement_group",
+                    {
+                        "mode": "any",
+                        "options": [],
+                    },
+                )
+            ),
+            "degree_requirement_satisfied": (
+                degree_requirement_satisfied
+            ),
+            "degree_requirement_evidence": (
+                degree_evidence
             ),
             "responsibilities": (
                 job_profile.get(

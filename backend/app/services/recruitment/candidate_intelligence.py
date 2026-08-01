@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, Dict, List
 
 from app.services.recruitment.explainability_engine import (
     explainability_engine,
@@ -613,26 +613,9 @@ class CandidateIntelligence:
 
     def _risks(
         self,
-        review: dict[str, Any],
-    ) -> List[dict[str, str]]:
-        risks: list[
-            dict[str, str]
-        ] = []
-
-        scoring_context = (
-            review.get(
-                "scoring_context",
-                {},
-            )
-            or {}
-        )
-
-        job_context_available = bool(
-            scoring_context.get(
-                "job_context_available",
-                True,
-            )
-        )
+        review: Dict[str, Any],
+    ) -> List[Dict[str, str]]:
+        risks = []
 
         missing = (
             review.get(
@@ -642,37 +625,76 @@ class CandidateIntelligence:
             or []
         )
 
-        if job_context_available:
-            for keyword in missing[:5]:
-                risks.append(
-                    {
-                        "risk": (
-                            f"{str(keyword).title()} "
-                            "is not clearly demonstrated "
-                            "in the CV."
-                        ),
-                        "level": "Medium",
-                        "mitigation": (
-                            f"Only add {keyword} if "
-                            "truthful coursework, "
-                            "training, project work or "
-                            "practical exposure exists."
-                        ),
-                    }
+        degree_terms = {
+            str(item).lower().strip()
+            for item in (
+                review.get(
+                    "degree_requirements",
+                    [],
                 )
+                or []
+            )
+        }
 
-        else:
+        for keyword in missing:
+            key = str(
+                keyword
+            ).lower().strip()
+
+            # Degree alternatives are evaluated as
+            # a single OR group, not as separate
+            # mandatory requirements.
+            if key in degree_terms:
+                continue
+
             risks.append(
                 {
                     "risk": (
-                        "No specific job description "
-                        "was available for fit scoring."
+                        f"{str(keyword).title()} "
+                        "is not clearly demonstrated "
+                        "in the CV."
                     ),
                     "level": "Medium",
                     "mitigation": (
-                        "Provide the target job advert "
-                        "before making an interview "
-                        "decision."
+                        f"Only add {keyword} if the "
+                        "candidate has truthful "
+                        "coursework, training, "
+                        "project work or practical "
+                        "exposure."
+                    ),
+                }
+            )
+
+            if len(risks) >= 5:
+                break
+
+        degree_options = (
+            review.get(
+                "degree_requirements",
+                [],
+            )
+            or []
+        )
+
+        if (
+            degree_options
+            and not review.get(
+                "degree_requirement_satisfied",
+                False,
+            )
+        ):
+            risks.append(
+                {
+                    "risk": (
+                        "No clearly matching degree "
+                        "discipline was detected from "
+                        "the advertised alternatives."
+                    ),
+                    "level": "Medium",
+                    "mitigation": (
+                        "Clarify the exact degree, "
+                        "major and related coursework "
+                        "shown in the submitted CV."
                     ),
                 }
             )
@@ -682,19 +704,19 @@ class CandidateIntelligence:
                 "experience_score",
                 0,
             )
-            < 55
+            < 65
         ):
             risks.append(
                 {
                     "risk": (
-                        "Practical experience evidence "
-                        "may be limited."
+                        "Practical experience may "
+                        "appear limited for the role."
                     ),
                     "level": "Medium",
                     "mitigation": (
-                        "Clarify truthful internship, "
+                        "Clarify internship, "
                         "attachment, project and "
-                        "workplace responsibilities."
+                        "practical responsibilities."
                     ),
                 }
             )
@@ -704,7 +726,7 @@ class CandidateIntelligence:
                 "achievement_score",
                 0,
             )
-            < 50
+            < 60
         ):
             risks.append(
                 {
@@ -714,9 +736,11 @@ class CandidateIntelligence:
                     ),
                     "level": "Low",
                     "mitigation": (
-                        "Add truthful numbers, volumes, "
-                        "reports produced or performance "
-                        "outcomes where available."
+                        "Add truthful numbers, "
+                        "volumes, reports produced, "
+                        "records processed or "
+                        "performance metrics where "
+                        "available."
                     ),
                 }
             )
@@ -763,9 +787,20 @@ class CandidateIntelligence:
 
     def _prep_focus(
         self,
-        review: dict[str, Any],
+        review: Dict[str, Any],
     ) -> List[str]:
-        focus: list[str] = []
+        focus = []
+
+        degree_terms = {
+            str(item).lower().strip()
+            for item in (
+                review.get(
+                    "degree_requirements",
+                    [],
+                )
+                or []
+            )
+        }
 
         for keyword in (
             review.get(
@@ -773,12 +808,36 @@ class CandidateIntelligence:
                 [],
             )
             or []
-        )[:4]:
+        ):
+            if (
+                str(keyword)
+                .lower()
+                .strip()
+                in degree_terms
+            ):
+                continue
+
             focus.append(
-                (
-                    "Prepare a truthful answer about "
-                    f"any exposure to {keyword}."
-                )
+                "Prepare a truthful answer "
+                f"about any exposure to {keyword}."
+            )
+
+            if len(focus) >= 4:
+                break
+
+        if (
+            review.get(
+                "degree_requirements"
+            )
+            and not review.get(
+                "degree_requirement_satisfied",
+                False,
+            )
+        ):
+            focus.append(
+                "Prepare to explain how your "
+                "degree and coursework relate "
+                "to the accepted study fields."
             )
 
         job_title = (
@@ -790,11 +849,9 @@ class CandidateIntelligence:
 
         if "finance" in job_title:
             focus.append(
-                (
-                    "Prepare to explain reconciliations, "
-                    "financial records, invoices and "
-                    "Excel use."
-                )
+                "Prepare to explain "
+                "reconciliations, financial "
+                "records, invoices and Excel use."
             )
 
         if (
@@ -802,21 +859,17 @@ class CandidateIntelligence:
             or "programme" in job_title
         ):
             focus.append(
-                (
-                    "Prepare examples of data "
-                    "collection, stakeholder "
-                    "communication and programme "
-                    "support."
-                )
+                "Prepare examples of data "
+                "collection, stakeholder "
+                "communication and programme "
+                "support."
             )
 
         if "data" in job_title:
             focus.append(
-                (
-                    "Prepare to discuss projects, "
-                    "tools, datasets and measurable "
-                    "outcomes."
-                )
+                "Prepare to discuss projects, "
+                "tools, datasets and measurable "
+                "outcomes."
             )
 
         return focus[:6]
@@ -888,9 +941,9 @@ class CandidateIntelligence:
 
     def _salary_intelligence(
         self,
-        review: dict[str, Any],
+        review: Dict[str, Any],
         score: float,
-    ) -> dict[str, Any]:
+    ) -> Dict[str, Any]:
         title = (
             review.get(
                 "job_title"
@@ -905,10 +958,13 @@ class CandidateIntelligence:
             or ""
         ).lower()
 
-        if (
-            "graduate" in title
-            or "intern" in title
-            or "trainee" in title
+        if any(
+            term in title
+            for term in (
+                "graduate",
+                "intern",
+                "trainee",
+            )
         ):
             low, high = 250, 700
             market_label = (
@@ -966,13 +1022,16 @@ class CandidateIntelligence:
                 f"${recommended}"
             ),
             "recommended_positioning": (
-                "Indicative positioning is around "
+                "Heuristic estimate only. "
+                f"Indicative positioning is around "
                 f"${recommended}, subject to employer "
-                "budget, location, benefits and verified "
-                "experience."
+                "budget, location, benefits and "
+                "verified experience. This estimate "
+                "is not based on live market data."
             ),
             "confidence": (
-                "Indicative only; not market-verified"
+                "Heuristic only; "
+                "not market-verified"
             ),
         }
 
